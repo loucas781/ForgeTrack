@@ -55,9 +55,9 @@ app.use('/api/auth', rateLimit({
   message: { error: 'Too many attempts — please wait 15 minutes and try again.' },
 }))
 
-// Serve static assets only (CSS, JS, images, fonts) — NOT html files
-// HTML pages are served explicitly below so auth guards can run first
-app.use(express.static(path.join(__dirname, '../public'), { index: false, extensions: [] }))
+// Serve static assets (CSS, JS, images etc.) but not directory indexes
+// HTML files are handled explicitly below so auth guards run first
+app.use(express.static(path.join(__dirname, '../public'), { index: false }))
 
 // Inject APP_ENV into page responses via a small config endpoint
 app.get('/api/config', optionalAuth, (req, res) => {
@@ -91,7 +91,9 @@ app.get('/reports.html',       requireAuth, (req, res) => res.sendFile(path.join
 // ── 404 handler ────────────────────────────────────────────────────────────────
 app.use((req, res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' })
-  res.redirect('/')
+  // Don't redirect unknown pages to / — that causes redirect loops for
+  // unauthenticated users. Just 404 non-API requests that don't match a route.
+  res.status(404).send('Not found')
 })
 
 // ── Error handler ──────────────────────────────────────────────────────────────
