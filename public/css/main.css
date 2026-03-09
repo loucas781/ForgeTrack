@@ -455,3 +455,182 @@ select.form-control {
 /* ── Section ─────────────────────────────────────────────────────── */
 .section-card { padding: 24px; margin-bottom: 24px; }
 .section-title { font-size: 14px; font-weight: 700; padding-bottom: 12px; border-bottom: 1px solid var(--border-2); margin-bottom: 20px; }
+
+/* ================================================================
+   RESPONSIVE / MOBILE STYLES
+   Breakpoints:
+     --mobile:  max 600px
+     --tablet:  max 900px
+================================================================ */
+
+/* ── Mobile topbar adjustments ──────────────────────────────────── */
+.topbar-menu-btn {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 36px; height: 36px; background: transparent; border: none;
+  border-radius: var(--r-md); color: rgba(255,255,255,.8); cursor: pointer;
+  flex-shrink: 0; transition: background var(--t-fast);
+}
+.topbar-menu-btn:hover { background: rgba(255,255,255,.1); }
+
+/* ── Mobile sidebar overlay ─────────────────────────────────────── */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0; background: rgba(9,30,66,.5);
+  z-index: 90; animation: fadeIn 150ms ease;
+}
+.sidebar-overlay.show { display: block; }
+
+/* ── Bottom nav bar (mobile only) ───────────────────────────────── */
+.bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 56px; background: var(--surface);
+  border-top: 1px solid var(--border-2);
+  z-index: 80; padding: 0 8px;
+  align-items: center; justify-content: space-around;
+}
+.bottom-nav-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 6px 12px; background: none; border: none;
+  color: var(--text-3); font-size: 10px; font-family: var(--font);
+  cursor: pointer; border-radius: var(--r-md); flex: 1;
+  transition: color var(--t-fast);
+  text-decoration: none;
+}
+.bottom-nav-btn.active { color: var(--brand); }
+.bottom-nav-btn svg { width: 20px; height: 20px; }
+
+/* ── Tablet (≤900px) ─────────────────────────────────────────────── */
+@media (max-width: 900px) {
+
+  /* Sidebar becomes a slide-in drawer */
+  .sidebar {
+    position: fixed; top: var(--topbar-h); left: 0; bottom: 0;
+    z-index: 91; transform: translateX(-100%);
+    transition: transform 250ms cubic-bezier(.4,0,.2,1);
+    box-shadow: var(--shadow-xl);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  /* Show hamburger button */
+  .topbar-menu-btn { display: flex; }
+
+  /* Hide the "Projects" nav button — redundant on mobile */
+  .topbar-nav { display: none; }
+
+  /* Shrink search */
+  .topbar-search { max-width: 260px; }
+
+  /* Reports grid: 1 col */
+  .reports-grid { grid-template-columns: 1fr !important; }
+
+  /* Dashboard grid: 1 col */
+  .dashboard-grid { grid-template-columns: 1fr !important; }
+
+  /* Issue layout: stack sidebar below */
+  .issue-layout { grid-template-columns: 1fr !important; }
+  .sidebar-card { position: static !important; }
+
+  /* Form grids collapse */
+  .form-grid-2 { grid-template-columns: 1fr !important; }
+  .form-grid-3 { grid-template-columns: 1fr !important; }
+
+  /* Modal fills screen */
+  .modal-backdrop { padding: 8px; align-items: flex-end; }
+  .modal { border-radius: var(--r-lg) var(--r-lg) 0 0; max-height: 92vh; }
+}
+
+/* ── Mobile (≤600px) ─────────────────────────────────────────────── */
+@media (max-width: 600px) {
+
+  /* Topbar: hide search and settings icon, show hamburger */
+  .topbar-center { display: none; }
+  .topbar-icon-btn { display: none; }
+  .topbar-logo-text { display: none; } /* show only icon on very small screens */
+
+  /* Avatar button stays visible */
+  .topbar-right { gap: 4px; }
+
+  /* Show bottom nav */
+  .bottom-nav { display: flex; }
+
+  /* Push page content above bottom nav */
+  .page-content { padding-bottom: 64px; }
+
+  /* Page padding tighter */
+  .page-pad { padding: 16px; }
+
+  /* Page header stacks */
+  .page-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-header > div:last-child { display: flex; justify-content: flex-end; }
+
+  /* Stats row: 2x2 grid */
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 24px; }
+
+  /* Issue row: hide some meta on tiny screens */
+  .ir-labels { display: none; }
+  .ir-meta .ir-meta-item:not(:last-child) { display: none; }
+
+  /* Issue group header */
+  .issue-group-header { padding: 10px 12px; }
+
+  /* Section card less padding */
+  .section-card { padding: 16px; }
+
+  /* Filter bar: vertical stack */
+  .filter-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .filter-group { flex-wrap: wrap; }
+
+  /* Modal full-width */
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal { border-radius: 16px 16px 0 0; max-height: 95vh; }
+  .modal-body { padding: 16px; }
+  .modal-header { padding: 16px; }
+  .modal-footer { padding: 12px 16px; flex-direction: column-reverse; }
+  .modal-footer .btn { width: 100%; justify-content: center; }
+
+  /* Auth card full width */
+  .auth-card { border-radius: 0; min-height: 100vh; max-width: 100%; }
+  .auth-form  { padding: 20px; }
+  .auth-logo  { padding: 20px; }
+
+  /* Profile/settings: full width sections */
+  .profile-layout { gap: 16px; }
+
+  /* Topbar search: full-width when open */
+  .topbar-search-open {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--gray-950); z-index: 200;
+    display: flex; flex-direction: column; padding: 12px;
+  }
+
+  /* h1 smaller on mobile */
+  h1 { font-size: 20px; }
+
+  /* Dropdown menus full width on mobile */
+  .dropdown-menu-r { left: auto; right: 0; min-width: 200px; }
+
+  /* Buttons on mobile: slightly taller tap targets */
+  .btn { min-height: 36px; }
+  .btn-sm { min-height: 30px; }
+}
+
+/* ── Touch: larger tap targets ───────────────────────────────────── */
+@media (pointer: coarse) {
+  .filter-chip { padding: 6px 12px; }
+  .dropdown-item { padding: 12px 16px; }
+  .sidebar-link { padding: 10px 16px; }
+  .issue-row { height: auto; min-height: 48px; padding: 10px 12px; }
+  .color-swatch { width: 34px; height: 34px; }
+  .form-control { min-height: 40px; }
+  select.form-control { min-height: 40px; }
+}
+
+/* ── Tablet issue row: hide less important columns ───────────────── */
+@media (max-width: 760px) {
+  .ir-labels { display: none; }
+  .search-result-project { display: none; }
+}
