@@ -1,53 +1,71 @@
 #!/usr/bin/env bash
-# Copyright (c) 2021-2026 community-scripts ORG
-# Author: ForgeTrack
-# License: MIT
-# Source: https://github.com/loucas781/ForgeTrack
-# Runs inside the LXC container after creation
+# ForgeTrack install script
+# Runs inside the LXC container via: pct exec $CTID -- bash -c "$(curl ...)"
+# Self-contained — no dependency on FUNCTIONS_FILE_PATH or community-scripts helpers
 
-source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
-color
-verb_ip6
-catch_errors
-setting_up_container
-network_check
-update_os
+set -euo pipefail
 
+# ── Colour helpers (mirrors community-scripts style) ─────────────────────────
+YW=$(echo "\033[33m")
+GN=$(echo "\033[1;92m")
+RD=$(echo "\033[01;31m")
+CL=$(echo "\033[m")
+CM="${GN}✓${CL}"
+CROSS="${RD}✗${CL}"
+INFO="💡"
+
+msg_info()  { echo -e " ${INFO}  ${YW}${1}...${CL}"; }
+msg_ok()    { echo -e " ${CM}  ${GN}${1}${CL}"; }
+msg_error() { echo -e " ${CROSS}  ${RD}${1}${CL}"; exit 1; }
+
+# ── 1. Update OS ──────────────────────────────────────────────────────────────
+msg_info "Updating OS packages"
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get upgrade -y -qq
+msg_ok "OS packages updated"
+
+# ── 2. Install base dependencies ──────────────────────────────────────────────
 msg_info "Installing dependencies"
-$STD apt-get install -y \
+apt-get install -y -qq \
   curl \
   git \
   ca-certificates \
   gnupg
 msg_ok "Installed dependencies"
 
+# ── 3. Node.js 20 ─────────────────────────────────────────────────────────────
 msg_info "Setting up Node.js 20 repository"
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
   | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
   > /etc/apt/sources.list.d/nodesource.list
-$STD apt-get update
-$STD apt-get install -y nodejs
+apt-get update -qq
+apt-get install -y -qq nodejs
 msg_ok "Installed Node.js $(node --version)"
 
+# ── 4. Clone ForgeTrack ───────────────────────────────────────────────────────
 msg_info "Cloning ForgeTrack (develop branch)"
-$STD git clone \
+git clone \
   --branch develop \
   --single-branch \
   https://github.com/loucas781/ForgeTrack.git \
-  /opt/forgetrack
+  /opt/forgetrack 2>&1 | grep -v "^$" || true
 msg_ok "Cloned ForgeTrack"
 
+# ── 5. Install Node dependencies ──────────────────────────────────────────────
 msg_info "Installing Node.js dependencies"
 cd /opt/forgetrack
-$STD npm ci --omit=dev
+npm ci --omit=dev --silent
 msg_ok "Installed Node.js dependencies"
 
+# ── 6. Generate JWT secret ────────────────────────────────────────────────────
 msg_info "Generating JWT secret"
 JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
 msg_ok "Generated JWT secret"
 
+# ── 7. Write environment config ───────────────────────────────────────────────
 msg_info "Writing environment configuration"
 mkdir -p /opt/forgetrack/data
 cat > /opt/forgetrack/.env.development <<ENVEOF
@@ -62,10 +80,13 @@ COOKIE_MAX_AGE_HOURS=72
 ENVEOF
 msg_ok "Wrote environment configuration"
 
+# ── 8. Run DB migration ───────────────────────────────────────────────────────
 msg_info "Running database migration"
-NODE_ENV=development node /opt/forgetrack/server/db/migrate.js
+cd /opt/forgetrack
+NODE_ENV=development node server/db/migrate.js
 msg_ok "Database initialised"
 
+# ── 9. Create systemd service ─────────────────────────────────────────────────
 msg_info "Creating systemd service"
 cat > /etc/systemd/system/forgetrack.service <<SVCEOF
 [Unit]
@@ -88,9 +109,12 @@ SyslogIdentifier=forgetrack
 [Install]
 WantedBy=multi-user.target
 SVCEOF
-systemctl enable -q --now forgetrack
-msg_ok "Created and started ForgeTrack service"
+systemctl daemon-reload
+systemctl enable -q forgetrack
+systemctl start forgetrack
+msg_ok "ForgeTrack service started"
 
+# ── 10. Write update helper ───────────────────────────────────────────────────
 msg_info "Writing update helper"
 cat > /opt/forgetrack/update.sh <<'UPDATEEOF'
 #!/usr/bin/env bash
@@ -99,15 +123,16 @@ echo "Pulling latest from develop..."
 cd /opt/forgetrack
 git pull origin develop
 echo "Installing dependencies..."
-npm ci --omit=dev
+npm ci --omit=dev --silent
 echo "Running database migration..."
 NODE_ENV=development node server/db/migrate.js
 echo "Restarting service..."
 systemctl restart forgetrack
-echo "Done! ForgeTrack running at http://localhost:3000"
+echo "Done — ForgeTrack is running at http://localhost:3000"
 UPDATEEOF
 chmod +x /opt/forgetrack/update.sh
 msg_ok "Created update script at /opt/forgetrack/update.sh"
 
-motd_ssh
-customize
+# ── Done ──────────────────────────────────────────────────────────────────────
+echo ""
+msg_ok "ForgeTrack installation complete!"

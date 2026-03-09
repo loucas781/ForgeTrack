@@ -5,18 +5,17 @@ source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxV
 # License: MIT
 # Source: https://github.com/loucas781/ForgeTrack
 
-# Override header_info so the banner says "ForgeTrack" instead of
-# "Proxmox Helper Scripts" — must be redefined after sourcing build.func
+# ── Override header so banner says ForgeTrack, not "Proxmox Helper Scripts" ───
 function header_info() {
   clear
-  cat <<"BANNER"
+  cat << "BANNER"
     ███████╗ ██████╗ ██████╗  ██████╗ ███████╗████████╗██████╗  █████╗  ██████╗██╗  ██╗
     ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
     █████╗  ██║   ██║██████╔╝██║  ███╗█████╗     ██║   ██████╔╝███████║██║     █████╔╝ 
     ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝     ██║   ██╔══██╗██╔══██║██║     ██╔═██╗ 
     ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗   ██║   ██║  ██║██║  ██║╚██████╗██║  ██╗
     ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
-                              Install Script
+                                    Install Script
 BANNER
 }
 
@@ -59,11 +58,18 @@ function update_script() {
   exit
 }
 
-# Point build.func at our own install script instead of the community-scripts repo
-INSTALL_URL="https://raw.githubusercontent.com/loucas781/ForgeTrack/develop/proxmox/install/forgetrack-install.sh"
-
+# ── Create the LXC container using build.func's tooling ───────────────────────
 start
 build_container
+
+# ── Run our own install script inside the container via pct exec ──────────────
+# build.func's build_container would normally fetch install/<app>-install.sh
+# from the community-scripts repo (hardcoded) — which 404s for our app.
+# Instead we stream our install script directly into the container ourselves.
+msg_info "Running ForgeTrack install script inside container"
+pct exec "$CTID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeTrack/develop/proxmox/install/forgetrack-install.sh)"
+msg_ok "ForgeTrack installed inside container"
+
 description
 
 msg_ok "Completed Successfully!\n"
