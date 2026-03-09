@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ForgeTrack — Proxmox LXC Install Script
-# Usage: bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeTrack/develop/proxmox/ct/forgetrack.sh)"
+# Usage: bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeTrack/main/proxmox/ct/forgetrack.sh)"
 
 set -euo pipefail
 
@@ -56,7 +56,7 @@ fi
 
 PVE_VERSION=$(pveversion | grep -oP '(?<=pve-manager/)\S+' || echo "unknown")
 PVE_NODE=$(hostname)
-INSTALL_URL="https://raw.githubusercontent.com/loucas781/ForgeTrack/develop/proxmox/install/forgetrack-install.sh"
+INSTALL_URL="https://raw.githubusercontent.com/loucas781/ForgeTrack/main/proxmox/install/forgetrack-install.sh"
 
 # ── Default settings ──────────────────────────────────────────────────────────
 CT_TYPE="1"
