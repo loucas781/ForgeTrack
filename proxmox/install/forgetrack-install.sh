@@ -57,13 +57,15 @@ git clone --branch develop --single-branch --quiet \
 msg_ok "ForgeTrack cloned"
 
 # ── 7. npm install ────────────────────────────────────────────────────────────
+msg_info "Updating npm to latest"
+HOME=/root npm install -g npm --cache /tmp/npm-cache --unsafe-perm --no-audit --no-fund --silent 2>&1 || true
+msg_ok "npm $(npm --version) ready"
+
 msg_info "Installing Node.js dependencies"
 cd /opt/forgetrack
 mkdir -p /tmp/npm-cache /tmp/npm-tmp
 chmod 777 /tmp/npm-cache /tmp/npm-tmp
 
-# Use npm install (not npm ci) — doesn't require a lockfile
-# --unsafe-perm prevents permission errors in unprivileged LXC uid remapping
 HOME=/root npm install \
   --omit=dev \
   --cache /tmp/npm-cache \

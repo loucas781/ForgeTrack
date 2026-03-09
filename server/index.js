@@ -43,8 +43,9 @@ app.use(cookieParser())
 // Rate limiting on auth endpoints
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false }))
 
-// Serve static files (HTML, CSS, JS, images)
-app.use(express.static(path.join(__dirname, '../public')))
+// Serve static assets only (CSS, JS, images, fonts) — NOT html files
+// HTML pages are served explicitly below so auth guards can run first
+app.use(express.static(path.join(__dirname, '../public'), { index: false, extensions: [] }))
 
 // Inject APP_ENV into page responses via a small config endpoint
 app.get('/api/config', optionalAuth, (req, res) => {
@@ -63,17 +64,29 @@ app.use('/api/issues',   require('./routes/issues'))
 app.use('/api/users',    require('./routes/users'))
 
 // ── Page routing — serve HTML files, guard protected pages ────────────────────
-// Public pages
-app.get('/login.html',  (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')))
-app.get('/signup.html', (req, res) => res.sendFile(path.join(__dirname, '../public/signup.html')))
+// Public pages — redirect to dashboard if already logged in
+app.get(['/login.html', '/signup.html'], (req, res) => {
+  const token = req.cookies?.token
+  if (token) {
+    try {
+      const jwt = require('jsonwebtoken')
+      jwt.verify(token, process.env.JWT_SECRET)
+      return res.redirect('/')   // already logged in → go to dashboard
+    } catch {
+      res.clearCookie('token')
+    }
+  }
+  const file = req.path === '/login.html' ? 'login.html' : 'signup.html'
+  res.sendFile(path.join(__dirname, '../public', file))
+})
 
 // Protected pages — redirect to login if no valid token
-app.get(['/', '/index.html'], requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')))
-app.get('/project.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/project.html')))
-app.get('/issue.html',        requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/issue.html')))
-app.get('/profile.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/profile.html')))
-app.get('/settings.html',     requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/settings.html')))
-app.get('/reports.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/reports.html')))
+app.get(['/', '/index.html'],  requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')))
+app.get('/project.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/project.html')))
+app.get('/issue.html',         requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/issue.html')))
+app.get('/profile.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/profile.html')))
+app.get('/settings.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/settings.html')))
+app.get('/reports.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/reports.html')))
 
 // ── 404 handler ────────────────────────────────────────────────────────────────
 app.use((req, res) => {
