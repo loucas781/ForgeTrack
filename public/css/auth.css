@@ -1,0 +1,17 @@
+body.auth-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--gray-950); padding: 24px; position: relative; overflow: hidden; }
+.auth-bg { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 50% at 20% 30%, rgba(0,82,204,.18) 0%, transparent 70%), radial-gradient(ellipse 50% 40% at 80% 70%, rgba(0,135,90,.12) 0%, transparent 70%); pointer-events: none; }
+.auth-card { position: relative; background: var(--surface); border-radius: 12px; box-shadow: 0 24px 80px rgba(9,30,66,.40); width: 100%; max-width: 440px; overflow: hidden; animation: slideUp 240ms cubic-bezier(.4,0,.2,1); }
+.auth-logo { display: flex; align-items: center; gap: 12px; padding: 24px 32px 20px; border-bottom: 1px solid var(--border-2); }
+.auth-logo-text { font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+.auth-tabs { display: flex; position: relative; background: var(--gray-100); border-bottom: 1px solid var(--border-2); }
+.auth-tab { flex: 1; padding: 12px 16px; text-align: center; font-size: 13px; font-weight: 500; color: var(--text-2); text-decoration: none; transition: color var(--t-base); position: relative; z-index: 1; }
+.auth-tab.active { color: var(--text); font-weight: 600; }
+.auth-tab-indicator { position: absolute; bottom: 0; width: 50%; height: 2px; background: var(--brand); border-radius: 2px 2px 0 0; transition: left var(--t-base); }
+.auth-form { padding: 24px 32px 32px; display: flex; flex-direction: column; }
+.auth-heading { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.auth-subheading { font-size: 13px; color: var(--text-2); margin-bottom: 20px; }
+.auth-error { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff5f5; border: 1px solid #ffc3b8; border-radius: var(--r-md); color: var(--red); font-size: 13px; margin-bottom: 16px; }
+.auth-error.hidden { display: none; }
+.auth-submit { width: 100%; justify-content: center; margin-top: 16px; }
+.auth-switch { text-align: center; font-size: 13px; color: var(--text-2); margin-top: 16px; }
+.auth-switch a { font-weight: 500; }

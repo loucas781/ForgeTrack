@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — IssueTracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body class="auth-page">
+  <div class="auth-bg"></div>
+
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="7" fill="#0052cc"/>
+        <path d="M9 22L15 9l3 5-3 3 7 5H9z" fill="white" opacity="0.9"/>
+        <path d="M15 9l7 13H15l-3-5 3-3V9z" fill="white" opacity="0.55"/>
+      </svg>
+      <span class="auth-logo-text">IssueTracker</span>
+    </div>
+
+    <div class="auth-tabs">
+      <a href="/login.html"  class="auth-tab active">Sign In</a>
+      <a href="/signup.html" class="auth-tab">Create Account</a>
+      <div class="auth-tab-indicator" style="left:0"></div>
+    </div>
+
+    <form class="auth-form" id="login-form" novalidate>
+      <h2 class="auth-heading">Welcome back</h2>
+      <p class="auth-subheading">Sign in to continue to IssueTracker</p>
+
+      <div id="form-error" class="auth-error hidden"></div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Email address</label>
+        <input class="form-control" type="email" id="email" name="email" autocomplete="email" placeholder="you@example.com" autofocus />
+      </div>
+
+      <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label" for="password">Password</label>
+        <div class="pw-wrap">
+          <input class="form-control" type="password" id="password" name="password" autocomplete="current-password" placeholder="Your password" />
+          <button type="button" class="pw-toggle" id="pw-toggle" title="Show/hide password">
+            <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg auth-submit" id="submit-btn">
+        Sign In
+      </button>
+
+      <p class="auth-switch">Don't have an account? <a href="/signup.html">Create one</a></p>
+    </form>
+  </div>
+
+  <script>
+    // Redirect if already logged in
+    fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(r => { if (r.ok) window.location.href = '/' })
+      .catch(() => {})
+
+    const form      = document.getElementById('login-form')
+    const errorEl   = document.getElementById('form-error')
+    const submitBtn = document.getElementById('submit-btn')
+    const pwInput   = document.getElementById('password')
+    const pwToggle  = document.getElementById('pw-toggle')
+
+    pwToggle.addEventListener('click', () => {
+      const visible = pwInput.type === 'text'
+      pwInput.type = visible ? 'password' : 'text'
+      pwToggle.querySelector('svg').style.opacity = visible ? '1' : '0.5'
+    })
+
+    function showError(msg) {
+      errorEl.textContent = msg
+      errorEl.classList.remove('hidden')
+    }
+    function hideError() { errorEl.classList.add('hidden') }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault()
+      hideError()
+      const email    = document.getElementById('email').value.trim()
+      const password = document.getElementById('password').value
+      if (!email || !password) { showError('Please enter your email and password.'); return }
+
+      submitBtn.disabled = true
+      submitBtn.textContent = 'Signing in…'
+      try {
+        const res  = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ email, password }) })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Login failed')
+        window.location.href = '/'
+      } catch (err) {
+        showError(err.message)
+        submitBtn.disabled = false
+        submitBtn.textContent = 'Sign In'
+      }
+    })
+  </script>
+</body>
+</html>

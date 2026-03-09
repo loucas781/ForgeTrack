@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project — IssueTracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <div id="app-root"></div>
+  <script src="/js/app.js"></script>
+  <script src="/js/shell.js"></script>
+  <script>
+  (async () => {
+    const pid  = getParam('id')
+    const view = getParam('view') || 'issues'
+    if (!pid) { location.href = '/'; return }
+
+    const project = await GET('/projects/' + pid).catch(() => null)
+    if (!project) { location.href = '/'; return }
+
+    injectShell({ project, activePage: view })
+    await initTopbar()
+
+    const content = document.getElementById('page-content')
+    document.title = `${project.name} — IssueTracker`
+
+    if (view === 'settings') {
+      await renderSettings(project, content)
+    } else {
+      await renderIssueList(project, content, view)
+    }
+
+    // ── Global create issue (wired to topbar button) ──────────────────────────
+    document.getElementById('create-issue-btn')?.addEventListener('click', async () => {
+      const users = await GET('/users')
+      populateSelect(document.getElementById('ci-project'), [project], 'id', 'name')
+      document.getElementById('ci-project').value = project.id
+      const asgn = document.getElementById('ci-assignee')
+      populateSelect(asgn, users, 'id', 'name', 'Unassigned')
+      openModal('create-issue-modal')
+    })
+    document.getElementById('create-issue-form')?.addEventListener('submit', async e => {
+      e.preventDefault()
+      try {
+        const issue = await POST('/issues', {
+          project_id:   document.getElementById('ci-project').value,
+          title:        document.getElementById('ci-title').value.trim(),
+          description:  document.getElementById('ci-desc').value.trim(),
+          type:         document.getElementById('ci-type').value,
+          status:       document.getElementById('ci-status').value,
+          priority:     document.getElementById('ci-priority').value,
+          assignee_id:  document.getElementById('ci-assignee').value || null,
+          story_points: parseInt(document.getElementById('ci-points').value) || null,
+          due_date:     document.getElementById('ci-due').value || null,
+          labels:       document.getElementById('ci-labels').value.split(',').map(l=>l.trim()).filter(Boolean),
+        })
+        closeModal('create-issue-modal')
+        location.href = `/issue.html?id=${issue.id}`
+      } catch (err) { toast(err.message, 'error') }
+    })
+
+    // ── Create project btn ────────────────────────────────────────────────────
+    document.getElementById('create-project-btn')?.addEventListener('click', async () => {
+      const users = await GET('/users')
+      populateSelect(document.getElementById('cp-lead'), users, 'id', 'name', '— Select lead —')
+      renderColorPicker(document.getElementById('cp-colors'), PROJECT_COLORS, '#0052cc', v => document.getElementById('cp-color').value = v)
+      openModal('create-project-modal')
+    })
+    document.getElementById('cp-name')?.addEventListener('input', e => { document.getElementById('cp-key').value = genProjectKey(e.target.value) })
+    document.getElementById('cp-key')?.addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6) })
+    document.getElementById('create-project-form')?.addEventListener('submit', async e => {
+      e.preventDefault()
+      try {
+        const proj = await POST('/projects', { name: document.getElementById('cp-name').value.trim(), key: document.getElementById('cp-key').value.trim(), description: document.getElementById('cp-desc').value.trim(), color: document.getElementById('cp-color').value, lead_id: document.getElementById('cp-lead').value || null })
+        closeModal('create-project-modal')
+        location.href = `/project.html?id=${proj.id}&view=issues`
+      } catch (err) { toast(err.message, 'error') }
+    })
+  })()
+
+  // ── Issue list view ─────────────────────────────────────────────────────────
+  async function renderIssueList(project, content, view) {
+    const bugsOnly = view === 'bugs'
+    const title    = view === 'backlog' ? 'Backlog' : bugsOnly ? 'Bug Reports' : 'Issues'
+
+    // Build filter state
+    const filters = { status: [], type: bugsOnly ? ['bug'] : [], priority: [], assignee: '', q: '' }
+    let showFilters = false
+    let users = []
+
+    async function fetchAndRender() {
+      const qs = new URLSearchParams({ project_id: project.id })
+      if (filters.status.length === 1)   qs.set('status',      filters.status[0])
+      if (filters.type.length === 1)     qs.set('type',        filters.type[0])
+      if (filters.priority.length === 1) qs.set('priority',    filters.priority[0])
+      if (filters.assignee)              qs.set('assignee_id', filters.assignee)
+      if (filters.q)                     qs.set('q',           filters.q)
+      let issues = await GET('/issues?' + qs)
+
+      // Client-side multi-filter (multi-select arrays)
+      if (filters.status.length > 1)   issues = issues.filter(i => filters.status.includes(i.status))
+      if (filters.type.length > 1)     issues = issues.filter(i => filters.type.includes(i.type))
+      if (filters.priority.length > 1) issues = issues.filter(i => filters.priority.includes(i.priority))
+
+      const issueContainer = document.getElementById('issue-container')
+      if (issueContainer) renderGroupedIssues(issues, issueContainer)
+      document.querySelectorAll('.issue-count').forEach(el => el.textContent = `${issues.length} issue${issues.length!==1?'s':''}`)
+    }
+
+    content.innerHTML = `
+      <div class="page-pad">
+        <div class="page-header">
+          <div>
+            <h1>${title}</h1>
+            <p class="text-2 text-sm mt-4 issue-count"></p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-secondary" id="filter-toggle-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              Filters
+            </button>
+            <button class="btn btn-primary" id="create-issue-page-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              ${bugsOnly ? 'Report Bug' : 'Create Issue'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter bar (hidden by default) -->
+        <div class="card filter-bar" id="filter-bar" style="display:none;margin-bottom:16px">
+          <input class="form-control" type="text" id="filter-q" placeholder="Search issues…" style="max-width:220px" />
+          <div class="filter-group">
+            <span class="filter-label">Status</span>
+            ${['todo','inprogress','review','done','cancelled'].map(s => `<button class="filter-chip" data-filter="status" data-val="${s}">${STATUS_LABELS[s]}</button>`).join('')}
+          </div>
+          ${!bugsOnly ? `<div class="filter-group">
+            <span class="filter-label">Type</span>
+            ${['bug','task','story','epic'].map(t => `<button class="filter-chip" data-filter="type" data-val="${t}">${TYPE_LABELS[t]}</button>`).join('')}
+          </div>` : ''}
+          <div class="filter-group">
+            <span class="filter-label">Priority</span>
+            ${['critical','high','medium','low','trivial'].map(p => `<button class="filter-chip" data-filter="priority" data-val="${p}">${PRIORITY_LABELS[p]}</button>`).join('')}
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Assignee</span>
+            <select class="form-control" id="filter-assignee" style="height:28px;font-size:12px;width:auto"></select>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="clear-filters-btn">✕ Clear</button>
+        </div>
+
+        <div id="issue-container"></div>
+      </div>`
+
+    users = await GET('/users')
+    const asnSel = document.getElementById('filter-assignee')
+    asnSel.innerHTML = '<option value="">All</option><option value="unassigned">Unassigned</option>' +
+      users.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('')
+
+    // Filter toggle
+    document.getElementById('filter-toggle-btn').addEventListener('click', () => {
+      showFilters = !showFilters
+      document.getElementById('filter-bar').style.display = showFilters ? 'flex' : 'none'
+    })
+    document.getElementById('clear-filters-btn').addEventListener('click', () => {
+      filters.status = []; filters.type = bugsOnly ? ['bug'] : []; filters.priority = []; filters.assignee = ''; filters.q = ''
+      document.getElementById('filter-q').value = ''
+      document.getElementById('filter-assignee').value = ''
+      document.querySelectorAll('.filter-chip.on').forEach(c => c.classList.remove('on'))
+      fetchAndRender()
+    })
+
+    // Filter chips
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const key = chip.dataset.filter, val = chip.dataset.val
+        chip.classList.toggle('on')
+        const arr = filters[key]
+        const idx = arr.indexOf(val)
+        if (idx >= 0) arr.splice(idx, 1); else arr.push(val)
+        fetchAndRender()
+      })
+    })
+    let searchDebounce
+    document.getElementById('filter-q').addEventListener('input', e => {
+      clearTimeout(searchDebounce)
+      searchDebounce = setTimeout(() => { filters.q = e.target.value.trim(); fetchAndRender() }, 250)
+    })
+    asnSel.addEventListener('change', e => { filters.assignee = e.target.value; fetchAndRender() })
+
+    // Create issue button (on this page, pre-fill project)
+    document.getElementById('create-issue-page-btn').addEventListener('click', async () => {
+      populateSelect(document.getElementById('ci-project'), [project], 'id', 'name')
+      document.getElementById('ci-project').value = project.id
+      if (bugsOnly) document.getElementById('ci-type').value = 'bug'
+      const asgn = document.getElementById('ci-assignee')
+      populateSelect(asgn, users, 'id', 'name', 'Unassigned')
+      openModal('create-issue-modal')
+    })
+
+    await fetchAndRender()
+  }
+
+  // ── Project settings view ───────────────────────────────────────────────────
+  async function renderSettings(project, content) {
+    const users = await GET('/users')
+    let selectedColor = project.color
+    let confirmingDelete = false
+
+    content.innerHTML = `
+      <div class="page-pad" style="max-width:860px">
+        <h1 style="margin-bottom:4px">Project Settings</h1>
+        <p class="text-2" style="margin-bottom:32px">Manage configuration for ${esc(project.name)}</p>
+
+        <!-- General settings -->
+        <div class="card section-card">
+          <h3 class="section-title">General</h3>
+          <form id="project-settings-form">
+            <div class="form-group">
+              <label class="form-label req">Project Name</label>
+              <input class="form-control" type="text" id="ps-name" value="${esc(project.name)}" required />
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label req">Project Key</label>
+                <input class="form-control" type="text" id="ps-key" value="${esc(project.key)}" maxlength="6" style="font-family:var(--mono);font-weight:600;text-transform:uppercase" required />
+                <span class="form-hint">Prefix for issue keys e.g. ${esc(project.key)}-42</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Project Lead</label>
+                <select class="form-control" id="ps-lead">
+                  <option value="">— None —</option>
+                  ${users.map(u => `<option value="${u.id}"${u.id===project.lead_id?' selected':''}>${esc(u.name)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description</label>
+              <textarea class="form-control" id="ps-desc" rows="3">${esc(project.description||'')}</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Project Colour</label>
+              <div class="color-picker" id="ps-colors"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+              <span id="ps-saved" style="color:var(--green);font-size:13px;display:none">✓ Saved!</span>
+            </div>
+          </form>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="card section-card danger-zone">
+          <h3 class="section-title" style="color:var(--red)">Danger Zone</h3>
+          <p class="text-2" style="margin-bottom:16px">Deleting a project is permanent and removes all associated issues and data.</p>
+          <div id="delete-area">
+            <button class="btn btn-danger" id="delete-project-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+              Delete Project
+            </button>
+          </div>
+        </div>
+      </div>`
+
+    document.getElementById('ps-key').addEventListener('input', e => {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)
+    })
+    renderColorPicker(document.getElementById('ps-colors'), PROJECT_COLORS, selectedColor, v => { selectedColor = v })
+
+    document.getElementById('project-settings-form').addEventListener('submit', async e => {
+      e.preventDefault()
+      try {
+        await PATCH('/projects/' + project.id, {
+          name:        document.getElementById('ps-name').value.trim(),
+          key:         document.getElementById('ps-key').value.trim(),
+          description: document.getElementById('ps-desc').value.trim(),
+          color:       selectedColor,
+          lead_id:     document.getElementById('ps-lead').value || null,
+        })
+        const saved = document.getElementById('ps-saved')
+        saved.style.display = 'inline'
+        setTimeout(() => saved.style.display = 'none', 2500)
+      } catch (err) { toast(err.message, 'error') }
+    })
+
+    document.getElementById('delete-project-btn').addEventListener('click', () => {
+      if (!confirmingDelete) {
+        confirmingDelete = true
+        document.getElementById('delete-area').innerHTML = `
+          <div class="danger-confirm">
+            <p style="font-size:13px;font-weight:600">Are you absolutely sure? This cannot be undone.</p>
+            <div style="display:flex;gap:12px">
+              <button class="btn btn-danger" id="confirm-delete-btn">Yes, Delete Project</button>
+              <button class="btn btn-secondary" id="cancel-delete-btn">Cancel</button>
+            </div>
+          </div>`
+        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+          try { await DELETE('/projects/' + project.id); location.href = '/' }
+          catch (err) { toast(err.message, 'error') }
+        })
+        document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+          confirmingDelete = false
+          document.getElementById('delete-area').innerHTML = `<button class="btn btn-danger" id="delete-project-btn">Delete Project</button>`
+        })
+      }
+    })
+  }
+  </script>
+</body>
+</html>

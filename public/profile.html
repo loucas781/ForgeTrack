@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile — IssueTracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <div id="app-root"></div>
+  <script src="/js/app.js"></script>
+  <script src="/js/shell.js"></script>
+  <script>
+  (async () => {
+    injectShell()
+    await initTopbar()
+    const config = await GET('/config')
+    const me = config.user
+    document.title = 'Profile — IssueTracker'
+    const content = document.getElementById('page-content')
+    let selectedColor = me?.color || '#0052cc'
+
+    content.innerHTML = `
+      <div class="page-pad" style="max-width:860px">
+        <h1 style="margin-bottom:4px">Your Profile</h1>
+        <p class="text-2" style="margin-bottom:32px">Manage your personal information and account security</p>
+
+        <!-- Profile Info -->
+        <div class="card section-card">
+          <h3 class="section-title">Personal Information</h3>
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg)">
+            <div id="avatar-preview">${avatarHtml(me, 60)}</div>
+            <div>
+              <div style="font-size:16px;font-weight:600" id="preview-name">${esc(me?.name)}</div>
+              <div class="text-3 text-sm">${esc(me?.email)}</div>
+              <div class="text-3 text-sm" style="margin-top:2px">Role: <strong style="color:var(--text-2)">${esc(me?.role)}</strong></div>
+            </div>
+          </div>
+          <div id="profile-error" class="auth-error" style="display:none;margin-bottom:16px"></div>
+          <form id="profile-form">
+            <div class="form-group">
+              <label class="form-label">Full Name</label>
+              <input class="form-control" type="text" id="pf-name" value="${esc(me?.name||'')}" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email Address</label>
+              <input class="form-control" type="email" id="pf-email" value="${esc(me?.email||'')}" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Avatar Colour</label>
+              <div class="color-picker" id="avatar-colors"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+              <span id="profile-saved" style="color:var(--green);font-size:13px;display:none">✓ Saved!</span>
+            </div>
+          </form>
+        </div>
+
+        <!-- Change Password -->
+        <div class="card section-card">
+          <h3 class="section-title">Change Password</h3>
+          <div id="pw-error" class="auth-error" style="display:none;margin-bottom:16px"></div>
+          <form id="pw-form">
+            <div class="form-group">
+              <label class="form-label">Current Password</label>
+              <input class="form-control" type="password" id="pf-cur-pw" autocomplete="current-password" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <input class="form-control" type="password" id="pf-new-pw" placeholder="Min. 6 characters" autocomplete="new-password" />
+            </div>
+            <div class="form-group" style="margin-bottom:20px">
+              <label class="form-label">Confirm New Password</label>
+              <input class="form-control" type="password" id="pf-con-pw" autocomplete="new-password" />
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <button type="submit" class="btn btn-primary">Update Password</button>
+              <span id="pw-saved" style="color:var(--green);font-size:13px;display:none">✓ Password updated!</span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <style>
+        .auth-error { display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff5f5;border:1px solid #ffc3b8;border-radius:var(--r-md);color:var(--red);font-size:13px; }
+      </style>`
+
+    // Avatar color picker
+    renderColorPicker(document.getElementById('avatar-colors'), AVATAR_COLORS, selectedColor, v => {
+      selectedColor = v
+      // Live preview
+      const previewUser = { ...me, color: v, initials: document.getElementById('pf-name').value.trim().split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) || me?.initials }
+      document.getElementById('avatar-preview').innerHTML = avatarHtml(previewUser, 60)
+    })
+
+    // Profile save
+    document.getElementById('profile-form').addEventListener('submit', async e => {
+      e.preventDefault()
+      const errEl = document.getElementById('profile-error')
+      errEl.style.display = 'none'
+      try {
+        const res = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ name: document.getElementById('pf-name').value.trim(), email: document.getElementById('pf-email').value.trim(), color: selectedColor }) })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        const saved = document.getElementById('profile-saved')
+        saved.style.display = 'inline'
+        setTimeout(() => saved.style.display = 'none', 2500)
+        document.getElementById('preview-name').textContent = data.user.name
+      } catch (err) { errEl.textContent = err.message; errEl.style.display = 'flex' }
+    })
+
+    // Password save
+    document.getElementById('pw-form').addEventListener('submit', async e => {
+      e.preventDefault()
+      const errEl = document.getElementById('pw-error')
+      errEl.style.display = 'none'
+      const newPw = document.getElementById('pf-new-pw').value
+      const conPw = document.getElementById('pf-con-pw').value
+      if (newPw !== conPw) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'flex'; return }
+      try {
+        const res = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ currentPassword: document.getElementById('pf-cur-pw').value, newPassword: newPw }) })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        document.getElementById('pf-cur-pw').value = ''
+        document.getElementById('pf-new-pw').value = ''
+        document.getElementById('pf-con-pw').value = ''
+        const saved = document.getElementById('pw-saved')
+        saved.style.display = 'inline'
+        setTimeout(() => saved.style.display = 'none', 2500)
+      } catch (err) { errEl.textContent = err.message; errEl.style.display = 'flex' }
+    })
+  })()
+  </script>
+</body>
+</html>

@@ -1,1 +1,269 @@
-# ForgeTrack
+# IssueTracker v2
+
+A self-hosted issue tracking application — **vanilla HTML, CSS, and JavaScript** frontend with a **Node.js / Express** backend and **SQLite** database. No build step required.
+
+---
+
+## Features
+
+- Multi-project support with unique issue keys (e.g. `WEB-42`)
+- Issue types: Bug, Task, Story, Epic
+- Full workflow: To Do → In Progress → In Review → Done → Cancelled
+- Priority levels: Critical, High, Medium, Low, Trivial
+- Dedicated Bug Reports view per project
+- Comments with per-user delete
+- Inline editing of issue titles and descriptions
+- Filter + search issues by status, type, priority, assignee, keyword
+- Reports page with bar charts per project
+- User accounts with signup, login, logout, and profile editing
+- Avatar colour picker
+- Change password (requires current password)
+- Environment badges (development/staging/production)
+- GitHub Actions CI/CD with per-branch environments
+
+---
+
+## Tech Stack
+
+| Layer     | Tech |
+|-----------|------|
+| Frontend  | Vanilla HTML, CSS, JavaScript (no framework) |
+| Backend   | Node.js + Express |
+| Database  | SQLite via `better-sqlite3` |
+| Auth      | JWT in HTTP-only cookies + bcrypt passwords |
+| CI/CD     | GitHub Actions |
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+
+
+### 1. Install dependencies
+```bash
+npm install
+```
+
+### 2. Run the database migration (first time only)
+```bash
+npm run setup
+```
+
+### 3. Start the server
+```bash
+# Development (loads .env.development, port 3000)
+npm run dev
+
+# Or with node directly
+node server/index.js
+```
+
+Open http://localhost:3000 — you'll be redirected to sign up for the first account.
+
+---
+
+## Configuration
+
+Each environment has its own `.env.*` file:
+
+| File | Used when |
+|------|-----------|
+| `.env.development` | `NODE_ENV=development` (default for `npm run dev`) |
+| `.env.staging`     | `NODE_ENV=staging` |
+| `.env.production`  | `NODE_ENV=production` |
+
+### Key settings
+
+```env
+PORT=3000
+JWT_SECRET=your-long-random-string    # CHANGE THIS in production!
+DB_PATH=./data/issuetracker.db        # Path to SQLite database file
+COOKIE_SECURE=false                   # Set true when using HTTPS
+COOKIE_MAX_AGE_HOURS=72               # Session duration
+APP_ENV=development                   # Controls env badge display
+```
+
+### Generate a secure JWT secret
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+```
+
+---
+
+## Git Branch Strategy
+
+| Branch    | Environment | Deployment |
+|-----------|-------------|------------|
+| `main`    | Production  | Auto-deploy to production server |
+| `staging` | Staging     | Auto-deploy to staging server |
+| `develop` | Staging     | Auto-deploy to staging server (preview) |
+| `feature/*` | —         | CI tests only, no deployment |
+
+### Typical workflow
+```bash
+# Work on a feature
+git checkout -b feature/my-feature
+
+# Test it, then merge to develop for staging preview
+git checkout develop
+git merge feature/my-feature
+git push origin develop   # → deploys to staging
+
+# When ready for production
+git checkout main
+git merge develop
+git push origin main      # → deploys to production
+```
+
+---
+
+## Self-Hosting
+
+The app serves its own static files — just run `node server/index.js` and optionally put it behind a reverse proxy.
+
+### With PM2 (recommended for production)
+```bash
+npm install -g pm2
+
+# Start
+NODE_ENV=production pm2 start server/index.js --name issuetracker
+
+# Auto-restart on reboot
+pm2 save
+pm2 startup
+```
+
+### Nginx reverse proxy
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    location / {
+        proxy_pass         http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### Docker
+```dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY . .
+RUN mkdir -p data
+EXPOSE 3000
+CMD ["node", "server/index.js"]
+```
+
+---
+
+## API Reference
+
+All endpoints require authentication via JWT cookie (set automatically on login).
+
+### Auth
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/signup` | Create account |
+| POST | `/api/auth/login` | Sign in |
+| POST | `/api/auth/logout` | Sign out |
+| GET  | `/api/auth/me` | Current user |
+| PATCH | `/api/auth/profile` | Update profile / password |
+
+### Projects
+| Method | Path | Description |
+|--------|------|-------------|
+| GET    | `/api/projects` | List all projects |
+| POST   | `/api/projects` | Create project |
+| GET    | `/api/projects/:id` | Get project |
+| PATCH  | `/api/projects/:id` | Update project |
+| DELETE | `/api/projects/:id` | Delete project |
+
+### Issues
+| Method | Path | Description |
+|--------|------|-------------|
+| GET    | `/api/issues?project_id=&status=&type=&priority=&assignee_id=&q=` | List/filter issues |
+| POST   | `/api/issues` | Create issue |
+| GET    | `/api/issues/:id` | Get issue with comments |
+| PATCH  | `/api/issues/:id` | Update issue |
+| DELETE | `/api/issues/:id` | Delete issue |
+| POST   | `/api/issues/:id/comments` | Add comment |
+| DELETE | `/api/issues/:id/comments/:cid` | Delete comment |
+
+### Users
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/users` | List all users |
+
+---
+
+## Project Structure
+
+```
+issuetracker-v2/
+├── server/
+│   ├── index.js               # Express entry point
+│   ├── db/
+│   │   ├── migrate.js         # Schema setup (run once)
+│   │   └── connection.js      # SQLite connection singleton
+│   ├── middleware/
+│   │   └── auth.js            # JWT middleware
+│   └── routes/
+│       ├── auth.js            # Auth endpoints
+│       ├── projects.js        # Projects endpoints
+│       ├── issues.js          # Issues + comments endpoints
+│       └── users.js           # Users endpoint
+├── public/                    # Static frontend (served directly)
+│   ├── css/
+│   │   ├── main.css           # Full design system
+│   │   └── auth.css           # Auth page styles
+│   ├── js/
+│   │   ├── app.js             # Shared utilities, API helpers
+│   │   └── shell.js           # Topbar + sidebar HTML injection
+│   ├── index.html             # Dashboard
+│   ├── login.html             # Sign in
+│   ├── signup.html            # Create account
+│   ├── project.html           # Project issues/backlog/bugs/settings
+│   ├── issue.html             # Issue detail
+│   ├── reports.html           # Project reports
+│   ├── profile.html           # User profile
+│   └── settings.html          # App settings
+├── data/                      # SQLite database files (git-ignored)
+├── .env.development
+├── .env.staging
+├── .env.production
+├── .gitignore
+├── .github/workflows/deploy.yml
+└── package.json
+```
+
+---
+
+## GitHub Actions Setup
+
+To enable automatic deployment, configure these secrets in your GitHub repository (**Settings → Secrets → Actions**):
+
+| Secret | Description |
+|--------|-------------|
+| `STAGING_HOST` | Staging server IP or hostname |
+| `STAGING_USER` | SSH username |
+| `STAGING_SSH_KEY` | Private SSH key |
+| `PROD_HOST` | Production server IP or hostname |
+| `PROD_USER` | SSH username |
+| `PROD_SSH_KEY` | Private SSH key |
+
+Then uncomment the deploy steps in `.github/workflows/deploy.yml`.
+
+---
+
+## License
+
+MIT

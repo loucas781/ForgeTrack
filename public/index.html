@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — IssueTracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <div id="app-root"></div>
+  <script src="/js/app.js"></script>
+  <script src="/js/shell.js"></script>
+  <script>
+  (async () => {
+    injectShell()
+    await initTopbar()
+
+    const content = document.getElementById('page-content')
+    const [projects, allIssues] = await Promise.all([GET('/projects'), GET('/issues')])
+
+    const stats = {
+      total:      allIssues.length,
+      open:       allIssues.filter(i => i.status !== 'done' && i.status !== 'cancelled').length,
+      inprogress: allIssues.filter(i => i.status === 'inprogress').length,
+      bugs:       allIssues.filter(i => i.type === 'bug').length,
+      done:       allIssues.filter(i => i.status === 'done').length,
+    }
+
+    const recent = [...allIssues].sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 10)
+
+    content.innerHTML = `
+      <div class="page-pad">
+        <div class="page-header">
+          <div>
+            <h1>Your Work</h1>
+            <p class="text-2 mt-4">Overview of all projects and recent activity</p>
+          </div>
+          <button class="btn btn-primary" id="new-project-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            New Project
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+          <div class="card stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total Issues</div></div>
+          <div class="card stat-card stat-blue"><div class="stat-value">${stats.open}</div><div class="stat-label">Open</div></div>
+          <div class="card stat-card stat-orange"><div class="stat-value">${stats.inprogress}</div><div class="stat-label">In Progress</div></div>
+          <div class="card stat-card stat-red"><div class="stat-value">${stats.bugs}</div><div class="stat-label">Bugs</div></div>
+          <div class="card stat-card stat-green"><div class="stat-value">${stats.done}</div><div class="stat-label">Done</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
+          <!-- Projects -->
+          <section>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <h3 style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-2)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                Projects
+              </h3>
+              <button class="btn btn-ghost btn-sm" id="new-project-btn-2">+ Add</button>
+            </div>
+            <div class="card" id="projects-list">
+              ${projects.length === 0
+                ? `<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg><p>No projects yet</p><button class="btn btn-primary btn-sm" id="new-project-empty">Create your first project</button></div>`
+                : projects.map(p => {
+                    const open = allIssues.filter(i => i.project_id === p.id && i.status !== 'done' && i.status !== 'cancelled').length
+                    const lead = p.lead_id ? { name: p.lead_name, initials: p.lead_initials, color: p.lead_color } : null
+                    return `
+                      <div class="issue-row" onclick="location.href='/project.html?id=${p.id}&view=issues'" style="height:auto;padding:12px 16px;align-items:center">
+                        ${projectIcon(p, 36)}
+                        <div style="flex:1;min-width:0">
+                          <div style="font-weight:600;font-size:14px">${esc(p.name)}</div>
+                          <div class="text-3 text-sm mono" style="margin-top:2px">${esc(p.key)}${p.description ? ` · ${esc(p.description.slice(0,50))}` : ''}</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+                          ${lead ? avatarHtml(lead, 22) : ''}
+                          <span class="text-2 text-sm">${open} open</span>
+                        </div>
+                      </div>`
+                  }).join('')
+              }
+            </div>
+          </section>
+
+          <!-- Recent Activity -->
+          <section>
+            <h3 style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-2);margin-bottom:12px">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              Recent Activity
+            </h3>
+            <div class="card">
+              ${recent.length === 0
+                ? `<div class="empty-state"><p>No activity yet</p></div>`
+                : recent.map(i => {
+                    const proj = projects.find(p => p.id === i.project_id)
+                    const asgn = i.assignee_id ? { name: i.assignee_name, initials: i.assignee_initials, color: i.assignee_color } : null
+                    return `
+                      <div class="issue-row" onclick="location.href='/issue.html?id=${i.id}'" style="height:auto;padding:10px 16px">
+                        ${typeIcon(i.type)}
+                        <div style="flex:1;min-width:0">
+                          <div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title)}</div>
+                          <div class="text-3 text-sm" style="display:flex;gap:8px;margin-top:2px">
+                            <span class="mono">${esc(i.key)}</span>
+                            <span>·</span><span>${esc(proj?.name||'')}</span>
+                            <span>·</span><span>${fmtRelative(i.updated_at)}</span>
+                          </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                          ${statusBadge(i.status)}
+                          ${asgn ? avatarHtml(asgn, 20) : ''}
+                        </div>
+                      </div>`
+                  }).join('')
+              }
+            </div>
+          </section>
+        </div>
+      </div>`
+
+    // Wire up new project buttons
+    async function openCreateProject() {
+      const users = await GET('/users')
+      const leadSel = document.getElementById('cp-lead')
+      populateSelect(leadSel, users, 'id', 'name', '— Select lead —')
+      renderColorPicker(document.getElementById('cp-colors'), PROJECT_COLORS, '#0052cc', v => document.getElementById('cp-color').value = v)
+      document.getElementById('cp-name').value = ''
+      document.getElementById('cp-key').value  = ''
+      document.getElementById('cp-desc').value = ''
+      openModal('create-project-modal')
+    }
+    ;['new-project-btn','new-project-btn-2','new-project-empty'].forEach(id => {
+      document.getElementById(id)?.addEventListener('click', openCreateProject)
+    })
+    document.getElementById('create-project-btn')?.addEventListener('click', openCreateProject)
+
+    // Auto-fill key from name
+    document.getElementById('cp-name')?.addEventListener('input', e => {
+      document.getElementById('cp-key').value = genProjectKey(e.target.value)
+    })
+    document.getElementById('cp-key')?.addEventListener('input', e => {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0,6)
+    })
+
+    // Create project submit
+    document.getElementById('create-project-form')?.addEventListener('submit', async e => {
+      e.preventDefault()
+      try {
+        const proj = await POST('/projects', {
+          name:        document.getElementById('cp-name').value.trim(),
+          key:         document.getElementById('cp-key').value.trim(),
+          description: document.getElementById('cp-desc').value.trim(),
+          color:       document.getElementById('cp-color').value,
+          lead_id:     document.getElementById('cp-lead').value || null,
+        })
+        closeModal('create-project-modal')
+        location.href = `/project.html?id=${proj.id}&view=issues`
+      } catch (err) { toast(err.message, 'error') }
+    })
+
+    // Global create issue
+    document.getElementById('create-issue-btn')?.addEventListener('click', async () => {
+      const projs = await GET('/projects')
+      populateSelect(document.getElementById('ci-project'), projs, 'id', 'name')
+      const users = await GET('/users')
+      const asgn = document.getElementById('ci-assignee')
+      populateSelect(asgn, users, 'id', 'name', 'Unassigned')
+      openModal('create-issue-modal')
+    })
+    document.getElementById('create-issue-form')?.addEventListener('submit', async e => {
+      e.preventDefault()
+      try {
+        const issue = await POST('/issues', {
+          project_id:   document.getElementById('ci-project').value,
+          title:        document.getElementById('ci-title').value.trim(),
+          description:  document.getElementById('ci-desc').value.trim(),
+          type:         document.getElementById('ci-type').value,
+          status:       document.getElementById('ci-status').value,
+          priority:     document.getElementById('ci-priority').value,
+          assignee_id:  document.getElementById('ci-assignee').value || null,
+          story_points: parseInt(document.getElementById('ci-points').value) || null,
+          due_date:     document.getElementById('ci-due').value || null,
+          labels:       document.getElementById('ci-labels').value.split(',').map(l=>l.trim()).filter(Boolean),
+        })
+        closeModal('create-issue-modal')
+        location.href = `/issue.html?id=${issue.id}`
+      } catch (err) { toast(err.message, 'error') }
+    })
+  })()
+  </script>
+</body>
+</html>

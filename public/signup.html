@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account — IssueTracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body class="auth-page">
+  <div class="auth-bg"></div>
+
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="7" fill="#0052cc"/>
+        <path d="M9 22L15 9l3 5-3 3 7 5H9z" fill="white" opacity="0.9"/>
+        <path d="M15 9l7 13H15l-3-5 3-3V9z" fill="white" opacity="0.55"/>
+      </svg>
+      <span class="auth-logo-text">IssueTracker</span>
+    </div>
+
+    <div class="auth-tabs">
+      <a href="/login.html"  class="auth-tab">Sign In</a>
+      <a href="/signup.html" class="auth-tab active">Create Account</a>
+      <div class="auth-tab-indicator" style="left:50%"></div>
+    </div>
+
+    <form class="auth-form" id="signup-form" novalidate>
+      <h2 class="auth-heading">Create your account</h2>
+      <p class="auth-subheading">Get started with IssueTracker</p>
+
+      <div id="form-error" class="auth-error hidden"></div>
+
+      <div class="form-group">
+        <label class="form-label req" for="name">Full name</label>
+        <input class="form-control" type="text" id="name" name="name" autocomplete="name" placeholder="Alex Morgan" autofocus />
+        <span class="form-error hidden" id="err-name"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label req" for="email">Email address</label>
+        <input class="form-control" type="email" id="email" name="email" autocomplete="email" placeholder="you@example.com" />
+        <span class="form-error hidden" id="err-email"></span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label req" for="password">Password</label>
+        <div class="pw-wrap">
+          <input class="form-control" type="password" id="password" name="password" autocomplete="new-password" placeholder="Min. 6 characters" />
+          <button type="button" class="pw-toggle" id="pw-toggle-1" title="Show/hide">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <span class="form-error hidden" id="err-password"></span>
+      </div>
+
+      <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label req" for="confirm">Confirm password</label>
+        <div class="pw-wrap">
+          <input class="form-control" type="password" id="confirm" name="confirm" autocomplete="new-password" placeholder="Repeat password" />
+          <button type="button" class="pw-toggle" id="pw-toggle-2" title="Show/hide">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <span class="form-error hidden" id="err-confirm"></span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg auth-submit" id="submit-btn">Create Account</button>
+      <p class="auth-switch">Already have an account? <a href="/login.html">Sign in</a></p>
+    </form>
+  </div>
+
+  <script>
+    fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(r => { if (r.ok) window.location.href = '/' })
+      .catch(() => {})
+
+    function pwToggle(inputId, btnId) {
+      document.getElementById(btnId).addEventListener('click', () => {
+        const inp = document.getElementById(inputId)
+        inp.type = inp.type === 'text' ? 'password' : 'text'
+      })
+    }
+    pwToggle('password', 'pw-toggle-1')
+    pwToggle('confirm',  'pw-toggle-2')
+
+    const form    = document.getElementById('signup-form')
+    const errEl   = document.getElementById('form-error')
+    const submitBtn = document.getElementById('submit-btn')
+
+    function fieldErr(id, msg) {
+      const el = document.getElementById('err-' + id)
+      if (!el) return
+      el.textContent = msg
+      el.classList.toggle('hidden', !msg)
+      document.getElementById(id)?.classList.toggle('err', !!msg)
+    }
+    function clearErrors() {
+      ['name','email','password','confirm'].forEach(f => fieldErr(f, ''))
+      errEl.classList.add('hidden')
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault()
+      clearErrors()
+      const name     = document.getElementById('name').value.trim()
+      const email    = document.getElementById('email').value.trim()
+      const password = document.getElementById('password').value
+      const confirm  = document.getElementById('confirm').value
+      let valid = true
+
+      if (!name)    { fieldErr('name', 'Full name is required.');   valid = false }
+      if (!email)   { fieldErr('email', 'Email is required.');      valid = false }
+      else if (!/\S+@\S+\.\S+/.test(email)) { fieldErr('email', 'Enter a valid email.'); valid = false }
+      if (!password)          { fieldErr('password', 'Password is required.'); valid = false }
+      else if (password.length < 6) { fieldErr('password', 'Min. 6 characters.'); valid = false }
+      if (password !== confirm) { fieldErr('confirm', 'Passwords do not match.'); valid = false }
+      if (!valid) return
+
+      submitBtn.disabled = true
+      submitBtn.textContent = 'Creating account…'
+      try {
+        const res  = await fetch('/api/auth/signup', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ name, email, password }) })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Signup failed')
+        window.location.href = '/'
+      } catch (err) {
+        errEl.textContent = err.message
+        errEl.classList.remove('hidden')
+        submitBtn.disabled = false
+        submitBtn.textContent = 'Create Account'
+      }
+    })
+  </script>
+</body>
+</html>

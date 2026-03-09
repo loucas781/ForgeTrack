@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reports — IssueTracker</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <div id="app-root"></div>
+  <script src="/js/app.js"></script>
+  <script src="/js/shell.js"></script>
+  <script>
+  (async () => {
+    const pid = getParam('id')
+    if (!pid) { location.href = '/'; return }
+
+    const project = await GET('/projects/' + pid).catch(() => null)
+    if (!project) { location.href = '/'; return }
+
+    injectShell({ project, activePage: 'reports' })
+    await initTopbar()
+    document.title = `Reports — ${project.name}`
+
+    const issues = await GET('/issues?project_id=' + pid)
+    const content = document.getElementById('page-content')
+
+    const byStatus   = ['todo','inprogress','review','done','cancelled'].map(s => ({ key:s, label:STATUS_LABELS[s],   count: issues.filter(i=>i.status===s).length,   color: {todo:'var(--gray-400)',inprogress:'var(--brand)',review:'var(--orange)',done:'var(--green)',cancelled:'var(--gray-300)'}[s] }))
+    const byPriority = ['critical','high','medium','low','trivial'].map(p =>   ({ key:p, label:PRIORITY_LABELS[p], count: issues.filter(i=>i.priority===p).length, color: {critical:'var(--p-critical)',high:'var(--p-high)',medium:'var(--p-medium)',low:'var(--p-low)',trivial:'var(--p-trivial)'}[p] }))
+    const byType     = ['bug','task','story','epic'].map(t =>                  ({ key:t, label:TYPE_LABELS[t],     count: issues.filter(i=>i.type===t).length,     color: {bug:'var(--t-bug)',task:'var(--t-task)',story:'var(--t-story)',epic:'var(--t-epic)'}[t] }))
+
+    function barChart(data) {
+      const max = Math.max(...data.map(d=>d.count), 1)
+      return `<div class="bar-chart">${data.map(d => `
+        <div class="bar-row">
+          <div class="bar-label">${esc(d.label)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(d.count/max)*100}%;background:${d.color}"></div></div>
+          <div class="bar-count">${d.count}</div>
+        </div>`).join('')}</div>`
+    }
+
+    const total  = issues.length
+    const open   = issues.filter(i => i.status!=='done'&&i.status!=='cancelled').length
+    const done   = issues.filter(i => i.status==='done').length
+    const bugs   = issues.filter(i => i.type==='bug'&&i.status!=='done').length
+    const pct    = total > 0 ? Math.round((done/total)*100) : 0
+
+    content.innerHTML = `
+      <div class="page-pad">
+        <div class="page-header">
+          <div>
+            <h1>Reports</h1>
+            <p class="text-2 mt-4">${esc(project.name)} · ${total} total issues</p>
+          </div>
+        </div>
+
+        <div class="stats-row">
+          <div class="card stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Issues</div></div>
+          <div class="card stat-card stat-blue"><div class="stat-value">${open}</div><div class="stat-label">Open</div></div>
+          <div class="card stat-card stat-green"><div class="stat-value">${done}</div><div class="stat-label">Resolved</div></div>
+          <div class="card stat-card stat-red"><div class="stat-value">${bugs}</div><div class="stat-label">Open Bugs</div></div>
+          <div class="card stat-card"><div class="stat-value">${pct}%</div><div class="stat-label">Completion</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px">
+          <div class="card section-card"><h3 class="section-title">By Status</h3>${barChart(byStatus)}</div>
+          <div class="card section-card"><h3 class="section-title">By Priority</h3>${barChart(byPriority)}</div>
+          <div class="card section-card"><h3 class="section-title">By Type</h3>${barChart(byType)}</div>
+        </div>
+      </div>`
+
+    // Topbar buttons
+    document.getElementById('create-issue-btn')?.addEventListener('click', async () => {
+      populateSelect(document.getElementById('ci-project'), [project], 'id', 'name')
+      document.getElementById('ci-project').value = project.id
+      const users = await GET('/users')
+      populateSelect(document.getElementById('ci-assignee'), users, 'id', 'name', 'Unassigned')
+      openModal('create-issue-modal')
+    })
+    document.getElementById('create-issue-form')?.addEventListener('submit', async e => {
+      e.preventDefault()
+      try {
+        const iss = await POST('/issues', { project_id: document.getElementById('ci-project').value, title: document.getElementById('ci-title').value.trim(), description: document.getElementById('ci-desc').value.trim(), type: document.getElementById('ci-type').value, status: document.getElementById('ci-status').value, priority: document.getElementById('ci-priority').value, assignee_id: document.getElementById('ci-assignee').value||null, story_points: parseInt(document.getElementById('ci-points').value)||null, due_date: document.getElementById('ci-due').value||null, labels: document.getElementById('ci-labels').value.split(',').map(l=>l.trim()).filter(Boolean) })
+        closeModal('create-issue-modal')
+        location.href = `/issue.html?id=${iss.id}`
+      } catch (err) { toast(err.message, 'error') }
+    })
+  })()
+  </script>
+</body>
+</html>
