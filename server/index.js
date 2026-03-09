@@ -40,8 +40,20 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
 
+// Trust the first proxy (Nginx Proxy Manager) so real client IPs are used
+// for rate limiting rather than NPM's internal IP
+app.set('trust proxy', 1)
+
 // Rate limiting on auth endpoints
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false }))
+// Keyed by real client IP — each user gets their own bucket
+app.use('/api/auth', rateLimit({
+  windowMs:        15 * 60 * 1000,  // 15 minutes
+  max:             20,               // 20 attempts per IP per window
+  standardHeaders: true,
+  legacyHeaders:   false,
+  skip: () => process.env.APP_ENV === 'development',  // disabled in dev LXC
+  message: { error: 'Too many attempts — please wait 15 minutes and try again.' },
+}))
 
 // Serve static assets only (CSS, JS, images, fonts) — NOT html files
 // HTML pages are served explicitly below so auth guards can run first
