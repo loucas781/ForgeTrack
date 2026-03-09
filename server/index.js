@@ -40,6 +40,13 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
 
+// Request logger — helps diagnose routing/auth issues
+app.use((req, res, next) => {
+  const hasCookie = !!req.cookies?.token
+  console.log(`[req] ${req.method} ${req.path} cookie=${hasCookie}`)
+  next()
+})
+
 // Trust proxy only when explicitly configured (i.e. behind Nginx Proxy Manager)
 // Accessing via direct IP without a proxy should not have this set
 if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1)
