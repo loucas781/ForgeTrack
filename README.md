@@ -1,4 +1,4 @@
-# ForgeTrack v2
+# ForgeTrack
 
 A self-hosted issue tracking application — **vanilla HTML, CSS, and JavaScript** frontend with a **Node.js / Express** backend and **SQLite** database. No build step required.
 
