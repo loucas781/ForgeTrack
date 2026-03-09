@@ -5,16 +5,15 @@
 
 set -euo pipefail
 
-# ── Colour helpers (mirrors community-scripts style) ─────────────────────────
+# ── Colour helpers ────────────────────────────────────────────────────────────
 YW=$(echo "\033[33m")
 GN=$(echo "\033[1;92m")
 RD=$(echo "\033[01;31m")
 CL=$(echo "\033[m")
 CM="${GN}✓${CL}"
 CROSS="${RD}✗${CL}"
-INFO="💡"
 
-msg_info()  { echo -e " ${INFO}  ${YW}${1}...${CL}"; }
+msg_info()  { echo -e " 💡  ${YW}${1}...${CL}"; }
 msg_ok()    { echo -e " ${CM}  ${GN}${1}${CL}"; }
 msg_error() { echo -e " ${CROSS}  ${RD}${1}${CL}"; exit 1; }
 
@@ -27,15 +26,11 @@ msg_ok "OS packages updated"
 
 # ── 2. Install base dependencies ──────────────────────────────────────────────
 msg_info "Installing dependencies"
-apt-get install -y -qq \
-  curl \
-  git \
-  ca-certificates \
-  gnupg
+apt-get install -y -qq curl git ca-certificates gnupg
 msg_ok "Installed dependencies"
 
 # ── 3. Node.js 20 ─────────────────────────────────────────────────────────────
-msg_info "Setting up Node.js 20 repository"
+msg_info "Setting up Node.js 20"
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
   | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
@@ -45,54 +40,67 @@ apt-get update -qq
 apt-get install -y -qq nodejs
 msg_ok "Installed Node.js $(node --version)"
 
-# ── 4. Clone ForgeTrack ───────────────────────────────────────────────────────
+# ── 4. PostgreSQL ─────────────────────────────────────────────────────────────
+msg_info "Installing PostgreSQL"
+apt-get install -y -qq postgresql postgresql-client
+systemctl enable postgresql
+systemctl start postgresql
+msg_ok "Installed PostgreSQL $(psql --version | awk '{print $3}')"
+
+# ── 5. Create database and user ───────────────────────────────────────────────
+msg_info "Creating database and user"
+DB_PASS=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
+sudo -u postgres psql -q <<SQL
+  CREATE USER forgetrack WITH PASSWORD '${DB_PASS}';
+  CREATE DATABASE forgetrack OWNER forgetrack;
+  GRANT ALL PRIVILEGES ON DATABASE forgetrack TO forgetrack;
+SQL
+msg_ok "Created database 'forgetrack'"
+
+# ── 6. Clone ForgeTrack ───────────────────────────────────────────────────────
 msg_info "Cloning ForgeTrack (develop branch)"
-git clone \
-  --branch develop \
-  --single-branch \
-  https://github.com/loucas781/ForgeTrack.git \
-  /opt/forgetrack 2>&1 | grep -v "^$" || true
+git clone --branch develop --single-branch \
+  https://github.com/loucas781/ForgeTrack.git /opt/forgetrack 2>&1 | grep -v "^$" || true
 msg_ok "Cloned ForgeTrack"
 
-# ── 5. Install Node dependencies ──────────────────────────────────────────────
+# ── 7. Install Node.js dependencies (pure JS — no compilation needed) ─────────
 msg_info "Installing Node.js dependencies"
 cd /opt/forgetrack
 npm ci --omit=dev --silent
 msg_ok "Installed Node.js dependencies"
 
-# ── 6. Generate JWT secret ────────────────────────────────────────────────────
+# ── 8. Generate JWT secret ────────────────────────────────────────────────────
 msg_info "Generating JWT secret"
 JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
 msg_ok "Generated JWT secret"
 
-# ── 7. Write environment config ───────────────────────────────────────────────
+# ── 9. Write environment config ───────────────────────────────────────────────
 msg_info "Writing environment configuration"
-mkdir -p /opt/forgetrack/data
 cat > /opt/forgetrack/.env.development <<ENVEOF
 NODE_ENV=development
 PORT=3000
 APP_NAME=ForgeTrack
 APP_ENV=development
 JWT_SECRET=${JWT_SECRET}
-DB_PATH=/opt/forgetrack/data/forgetrack.db
+DATABASE_URL=postgresql://forgetrack:${DB_PASS}@localhost:5432/forgetrack
 COOKIE_SECURE=false
 COOKIE_MAX_AGE_HOURS=72
 ENVEOF
 msg_ok "Wrote environment configuration"
 
-# ── 8. Run DB migration ───────────────────────────────────────────────────────
+# ── 10. Run DB migration ──────────────────────────────────────────────────────
 msg_info "Running database migration"
 cd /opt/forgetrack
 NODE_ENV=development node server/db/migrate.js
-msg_ok "Database initialised"
+msg_ok "Database schema ready"
 
-# ── 9. Create systemd service ─────────────────────────────────────────────────
+# ── 11. Create systemd service ────────────────────────────────────────────────
 msg_info "Creating systemd service"
 cat > /etc/systemd/system/forgetrack.service <<SVCEOF
 [Unit]
 Description=ForgeTrack Issue Tracker
 Documentation=https://github.com/loucas781/ForgeTrack
-After=network.target
+After=network.target postgresql.service
 
 [Service]
 Type=simple
@@ -114,7 +122,7 @@ systemctl enable -q forgetrack
 systemctl start forgetrack
 msg_ok "ForgeTrack service started"
 
-# ── 10. Write update helper ───────────────────────────────────────────────────
+# ── 12. Write update helper ───────────────────────────────────────────────────
 msg_info "Writing update helper"
 cat > /opt/forgetrack/update.sh <<'UPDATEEOF'
 #!/usr/bin/env bash
@@ -133,6 +141,5 @@ UPDATEEOF
 chmod +x /opt/forgetrack/update.sh
 msg_ok "Created update script at /opt/forgetrack/update.sh"
 
-# ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
 msg_ok "ForgeTrack installation complete!"
