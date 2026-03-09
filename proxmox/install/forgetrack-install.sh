@@ -28,7 +28,7 @@ curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
 echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
   > /etc/apt/sources.list.d/nodesource.list
 apt-get update -qq && apt-get install -y -qq nodejs
-msg_ok "Node.js $(node --version) installed"
+msg_ok "Node.js $(node --version) / npm $(npm --version) installed"
 
 # ── 4. PostgreSQL ─────────────────────────────────────────────────────────────
 msg_info "Installing PostgreSQL"
@@ -57,11 +57,20 @@ git clone --branch develop --single-branch --quiet \
 msg_ok "ForgeTrack cloned"
 
 # ── 7. npm install ────────────────────────────────────────────────────────────
-# Set HOME + npm cache explicitly — fixes uid-remap permission issues in
-# unprivileged LXC containers without needing a separate system user
 msg_info "Installing Node.js dependencies"
 cd /opt/forgetrack
-HOME=/root npm ci --omit=dev --cache /tmp/npm-cache --silent
+mkdir -p /tmp/npm-cache /tmp/npm-tmp
+chmod 777 /tmp/npm-cache /tmp/npm-tmp
+
+# Use npm install (not npm ci) — doesn't require a lockfile
+# --unsafe-perm prevents permission errors in unprivileged LXC uid remapping
+HOME=/root npm install \
+  --omit=dev \
+  --cache /tmp/npm-cache \
+  --unsafe-perm \
+  --no-audit \
+  --no-fund \
+  2>&1 || msg_error "npm install failed — see output above"
 msg_ok "Node.js dependencies installed"
 
 # ── 8. Write .env ─────────────────────────────────────────────────────────────
@@ -81,7 +90,8 @@ msg_ok "Configuration written"
 
 # ── 9. DB migration ───────────────────────────────────────────────────────────
 msg_info "Running database migration"
-cd /opt/forgetrack && HOME=/root NODE_ENV=development node server/db/migrate.js
+cd /opt/forgetrack && HOME=/root NODE_ENV=development node server/db/migrate.js \
+  || msg_error "Database migration failed"
 msg_ok "Database schema ready"
 
 # ── 10. systemd service ───────────────────────────────────────────────────────
@@ -114,7 +124,8 @@ cat > /opt/forgetrack/update.sh << 'UPDATEEOF'
 #!/usr/bin/env bash
 set -e; cd /opt/forgetrack
 git pull origin develop
-HOME=/root npm ci --omit=dev --cache /tmp/npm-cache --silent
+mkdir -p /tmp/npm-cache
+HOME=/root npm install --omit=dev --cache /tmp/npm-cache --unsafe-perm --no-audit --no-fund
 HOME=/root NODE_ENV=development node server/db/migrate.js
 systemctl restart forgetrack
 echo "Done — ForgeTrack running at http://localhost:3000"
