@@ -10,6 +10,15 @@ msg_info()  { echo -e "  💡  ${YW}${1}...${CL}"; }
 msg_ok()    { echo -e "  ✓   ${GN}${1}${CL}"; }
 msg_error() { echo -e "  ✖   ${RD}${1}${CL}"; exit 1; }
 
+# ── Environment (default: development) ────────────────────────────────────────
+APP_ENV="${1:-development}"
+if [[ "$APP_ENV" != "development" && "$APP_ENV" != "staging" && "$APP_ENV" != "production" ]]; then
+  echo "Usage: $0 [development|staging|production]"; exit 1
+fi
+COOKIE_SECURE="false"
+[[ "$APP_ENV" == "production" || "$APP_ENV" == "staging" ]] && COOKIE_SECURE="true"
+msg_ok "Deploying environment: ${APP_ENV}"
+
 # ── 1. OS update ──────────────────────────────────────────────────────────────
 msg_info "Updating OS packages"
 apt-get update -qq && apt-get upgrade -y -qq 2>&1 | tail -3
@@ -78,22 +87,22 @@ msg_ok "Node.js dependencies installed"
 # ── 8. Write .env ─────────────────────────────────────────────────────────────
 msg_info "Writing configuration"
 JWT_SECRET=$(openssl rand -hex 48)
-cat > /opt/forgetrack/.env.development << ENVEOF
-NODE_ENV=development
+cat > /opt/forgetrack/.env.${APP_ENV} << ENVEOF
+NODE_ENV=${APP_ENV}
 PORT=3000
 APP_NAME=ForgeTrack
-APP_ENV=development
+APP_ENV=${APP_ENV}
 JWT_SECRET=${JWT_SECRET}
 DATABASE_URL=postgresql://forgetrack:${DB_PASS}@localhost:5432/forgetrack
-COOKIE_SECURE=false
+COOKIE_SECURE=${COOKIE_SECURE}
 TRUST_PROXY=false
 COOKIE_MAX_AGE_HOURS=72
 ENVEOF
-msg_ok "Configuration written"
+msg_ok "Configuration written (.env.${APP_ENV})"
 
 # ── 9. DB migration ───────────────────────────────────────────────────────────
 msg_info "Running database migration"
-cd /opt/forgetrack && HOME=/root NODE_ENV=development node server/db/migrate.js \
+cd /opt/forgetrack && HOME=/root NODE_ENV=${APP_ENV} node server/db/migrate.js \
   || msg_error "Database migration failed"
 msg_ok "Database schema ready"
 
@@ -108,7 +117,7 @@ Requires=postgresql.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/forgetrack
-Environment=NODE_ENV=development
+Environment=NODE_ENV=${APP_ENV}
 ExecStart=/usr/bin/node server/index.js
 Restart=on-failure
 RestartSec=5
@@ -132,7 +141,7 @@ git fetch origin
 git reset --hard origin/develop
 mkdir -p /tmp/npm-cache
 HOME=/root npm install --omit=dev --cache /tmp/npm-cache --unsafe-perm --no-audit --no-fund
-HOME=/root NODE_ENV=development node server/db/migrate.js
+HOME=/root NODE_ENV=${APP_ENV} node server/db/migrate.js
 systemctl restart forgetrack
 echo "✓ ForgeTrack updated to $(cat .version)"
 UPDATEEOF

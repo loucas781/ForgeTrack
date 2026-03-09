@@ -64,6 +64,7 @@ DISK_SIZE="8"
 CORE_COUNT="2"
 RAM_SIZE="1024"
 CT_HOSTNAME="forgetrack"
+APP_ENV="development"
 CT_PASSWORD=""
 BRIDGE="vmbr0"
 NET_TYPE="dhcp"
@@ -172,6 +173,12 @@ if whiptail --backtitle "ForgeTrack Install" --title "SETTINGS" --yesno \
   # Default — still ask network & storage since those are environment-specific
   STORAGE=$(pick_storage)
   pick_network
+  APP_ENV=$(whiptail --backtitle "ForgeTrack Install" --title "ENVIRONMENT" \
+    --menu "Select deployment environment:" 12 58 3 \
+    "development" "Local dev / testing" \
+    "staging"     "Pre-production / RC" \
+    "production"  "Live environment" \
+    3>&1 1>&2 2>&3) || exit 1
   print_summary "Default Settings"
 else
   # Advanced
@@ -206,6 +213,13 @@ else
   else
     CT_TYPE="0"
   fi
+
+  APP_ENV=$(whiptail --backtitle "ForgeTrack Install" --title "ENVIRONMENT" \
+    --menu "Select deployment environment:" 12 58 3 \
+    "development" "Local dev / testing" \
+    "staging"     "Pre-production / RC" \
+    "production"  "Live environment" \
+    3>&1 1>&2 2>&3) || exit 1
 
   print_summary "Advanced Settings"
 fi
@@ -297,7 +311,7 @@ done
 echo ""
 msg_info "Running ForgeTrack install script"
 echo ""
-pct exec "$CTID" -- bash -c "$(curl -fsSL ${INSTALL_URL})"
+pct exec "$CTID" -- bash -c "$(curl -fsSL ${INSTALL_URL}) ${APP_ENV}"
 echo ""
 msg_ok "ForgeTrack installed"
 

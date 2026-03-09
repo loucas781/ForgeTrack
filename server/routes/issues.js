@@ -279,7 +279,6 @@ router.post('/:id/attachments', requireAuth, async (req, res) => {
   try {
     const { rows: [issue] } = await db.query('SELECT id FROM issues WHERE id = $1', [req.params.id])
     if (!issue) return res.status(404).json({ error: 'Issue not found' })
-    const { v4: uuidv4 } = require('uuid')
     const id = uuidv4()
     await db.query(
       'INSERT INTO issue_attachments (id, issue_id, uploader_id, filename, mime_type, data) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -288,6 +287,9 @@ router.post('/:id/attachments', requireAuth, async (req, res) => {
     res.status(201).json({ id, filename, mime_type })
   } catch (err) {
     console.error('attachment upload:', err.message)
+    if (err.message.includes('relation "issue_attachments" does not exist')) {
+      return res.status(503).json({ error: 'Attachments table not yet created — run: node server/db/migrate.js' })
+    }
     res.status(500).json({ error: 'Server error' })
   }
 })
