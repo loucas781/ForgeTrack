@@ -137,8 +137,17 @@ async function initTopbar() {
   const config = await loadConfig()
   const user   = config.user
 
-  // Set env chip if not production
+  // Version + env chip next to logo
   const logoEl = document.getElementById('topbar-logo-text')
+  if (logoEl && config.version) {
+    const v       = config.version
+    const base    = v.split('-')[0]
+    const isDev   = v.includes('-dev.')
+    const devNum  = isDev ? v.split('-dev.')[1] : null
+    const label   = isDev ? `v${base} <span style="opacity:.6;font-weight:400;font-size:11px">dev.${devNum}</span>` : `v${base}`
+    logoEl.insertAdjacentHTML('afterend',
+      `<span class="topbar-version" title="${esc(v)}">${label}</span>`)
+  }
   if (logoEl && config.appEnv && config.appEnv !== 'production') {
     logoEl.insertAdjacentHTML('afterend', `<span class="env-chip ${config.appEnv}">${config.appEnv}</span>`)
   }

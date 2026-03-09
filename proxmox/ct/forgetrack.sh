@@ -2,8 +2,23 @@
 source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2026 community-scripts ORG
 # Author: ForgeTrack
-# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT
 # Source: https://github.com/loucas781/ForgeTrack
+
+# Override header_info so the banner says "ForgeTrack" instead of
+# "Proxmox Helper Scripts" — must be redefined after sourcing build.func
+function header_info() {
+  clear
+  cat <<"BANNER"
+    ███████╗ ██████╗ ██████╗  ██████╗ ███████╗████████╗██████╗  █████╗  ██████╗██╗  ██╗
+    ██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝╚══██╔══╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+    █████╗  ██║   ██║██████╔╝██║  ███╗█████╗     ██║   ██████╔╝███████║██║     █████╔╝ 
+    ██╔══╝  ██║   ██║██╔══██╗██║   ██║██╔══╝     ██║   ██╔══██╗██╔══██║██║     ██╔═██╗ 
+    ██║     ╚██████╔╝██║  ██║╚██████╔╝███████╗   ██║   ██║  ██║██║  ██║╚██████╗██║  ██╗
+    ╚═╝      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+                              Install Script
+BANNER
+}
 
 APP="ForgeTrack"
 var_tags="${var_tags:-project-management;issue-tracker}"
@@ -44,6 +59,9 @@ function update_script() {
   exit
 }
 
+# Point build.func at our own install script instead of the community-scripts repo
+INSTALL_URL="https://raw.githubusercontent.com/loucas781/ForgeTrack/develop/proxmox/install/forgetrack-install.sh"
+
 start
 build_container
 description
@@ -52,5 +70,5 @@ msg_ok "Completed Successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
 echo -e "${INFO}${YW} Access ForgeTrack at:${CL}"
 echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:3000${CL}"
-echo -e "${INFO}${YW} First run: create your account at:${CL}"
+echo -e "${INFO}${YW} First time? Create your account at:${CL}"
 echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:3000/signup.html${CL}"

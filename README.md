@@ -1,4 +1,4 @@
-# ForgeTrack v2
+# ForgeTrack
 
 A self-hosted issue tracking application — **vanilla HTML, CSS, and JavaScript** frontend with a **Node.js / Express** backend and **SQLite** database. No build step required.
 
@@ -208,7 +208,7 @@ All endpoints require authentication via JWT cookie (set automatically on login)
 ## Project Structure
 
 ```
-forgetrack-v2/
+forgetrack/
 ├── server/
 │   ├── index.js               # Express entry point
 │   ├── db/
@@ -301,6 +301,39 @@ To enable automatic deployment, configure these secrets in your GitHub repositor
 | `PROD_SSH_KEY` | Private SSH key |
 
 Then uncomment the deploy steps in `.github/workflows/deploy.yml`.
+
+---
+
+## Versioning
+
+ForgeTrack uses automatic semantic versioning driven by GitHub Actions. You never need to manually update the version — it happens on every push.
+
+| Branch    | What happens | Example version |
+|-----------|-------------|-----------------|
+| `develop` | Increments build counter | `0.0.1-dev.4` |
+| `staging` | Bumps patch number, resets counter | `0.0.2` |
+| `main`    | Tags a GitHub Release | `v0.0.2` |
+
+The version is visible in two places in the UI:
+- **Topbar** — small `v0.0.1` chip next to the ForgeTrack logo
+- **Settings → Application Info** — full version string with build type badge
+
+### How the counter works
+
+- `BUILDCOUNT` — a plain text file in the repo root that the Actions workflow increments on every `develop` push
+- `package.json` `version` field — updated automatically by the workflow commit
+- Both files are committed back to the branch by `github-actions[bot]` with a `[skip ci]` tag so they don't trigger another run
+
+### Manual version bump
+
+To bump the minor or major version, update `package.json` manually before merging to `staging`:
+
+```bash
+# e.g. bump minor: 0.0.x → 0.1.0
+npm version minor --no-git-tag-version
+git add package.json BUILDCOUNT
+git commit -m "chore: bump minor version"
+```
 
 ---
 

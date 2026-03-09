@@ -18,6 +18,12 @@ if (fs.existsSync(envFile)) {
   })
 }
 
+// ─── Version — read from .version file (updated by GitHub Actions) ───────────
+const versionFile = path.join(__dirname, '../.version')
+const APP_VERSION = fs.existsSync(versionFile)
+  ? fs.readFileSync(versionFile, 'utf8').trim()
+  : require('../package.json').version
+
 // ─── Run migration on startup ─────────────────────────────────────────────────
 require('./db/migrate')
 
@@ -45,7 +51,7 @@ app.get('/api/config', optionalAuth, (req, res) => {
   res.json({
     appName: process.env.APP_NAME || 'ForgeTrack',
     appEnv:  process.env.APP_ENV  || env,
-    version: require('../package.json').version,
+    version: APP_VERSION,
     user:    req.user || null,
   })
 })

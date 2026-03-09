@@ -69,11 +69,46 @@
           <h3 class="section-title">Application Info</h3>
           <table style="width:100%;border-collapse:collapse;font-size:13px">
             <tbody>
-              <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2);width:180px">Version</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)" class="mono">${esc(config.version||'—')}</td></tr>
+              ${(() => {
+                const v       = config.version || '0.0.1'
+                const isDev   = v.includes('-dev.')
+                const isRC    = v.includes('-rc')
+                const base    = v.split('-')[0]
+                const devNum  = isDev ? v.split('-dev.')[1] : null
+                const tag     = isDev ? `v${base}-dev.${devNum}` : isRC ? `v${base}-rc` : `v${base}`
+                const ghTagUrl = `https://github.com/loucas781/ForgeTrack/releases/tag/${tag}`
+                const typeColor = isDev ? 'var(--orange)' : isRC ? 'var(--brand)' : 'var(--green)'
+                const typeLabel = isDev ? `dev build #${devNum}` : isRC ? 'release candidate' : 'release'
+                const tdA = `padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2);width:160px;vertical-align:top`
+                const tdB = `padding:8px 12px;border-bottom:1px solid var(--border-2)`
+                return `
+                  <tr>
+                    <td style="${tdA}">Version</td>
+                    <td style="${tdB}">
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <span class="mono" style="font-size:16px;font-weight:700;color:var(--text)">v${base}</span>
+                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:${typeColor}18;color:${typeColor};border:1px solid ${typeColor}40">${typeLabel}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="${tdA}">Build string</td>
+                    <td style="${tdB}">
+                      <span class="mono" style="font-size:12px;color:var(--text-2)">${esc(v)}</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="${tdA}">Git tag</td>
+                    <td style="${tdB}">
+                      <a href="${ghTagUrl}" target="_blank" rel="noopener"
+                         class="mono" style="font-size:12px;color:var(--brand)">${esc(tag)}</a>
+                    </td>
+                  </tr>`
+              })()}
               <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Environment</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)"><span class="env-chip ${esc(config.appEnv)}">${esc(config.appEnv)}</span></td></tr>
               <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Projects</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)">${projects.length}</td></tr>
               <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Team Members</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)">${users.length}</td></tr>
-              <tr><td style="padding:8px 12px;color:var(--text-2)">Database</td><td style="padding:8px 12px">SQLite (${esc(process?.env?.DB_PATH||'./data/forgetrack.db')})</td></tr>
+              <tr><td style="padding:8px 12px;color:var(--text-2)">Database</td><td style="padding:8px 12px">SQLite</td></tr>
             </tbody>
           </table>
         </div>

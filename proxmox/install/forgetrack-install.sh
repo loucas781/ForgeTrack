@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Copyright (c) 2021-2026 community-scripts ORG
 # Author: ForgeTrack
-# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT
 # Source: https://github.com/loucas781/ForgeTrack
+# Runs inside the LXC container after creation
 
 source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
 color
@@ -12,13 +13,13 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
+msg_info "Installing dependencies"
 $STD apt-get install -y \
   curl \
   git \
   ca-certificates \
   gnupg
-msg_ok "Installed Dependencies"
+msg_ok "Installed dependencies"
 
 msg_info "Setting up Node.js 20 repository"
 mkdir -p /etc/apt/keyrings
@@ -49,7 +50,7 @@ msg_ok "Generated JWT secret"
 
 msg_info "Writing environment configuration"
 mkdir -p /opt/forgetrack/data
-cat > /opt/forgetrack/.env.development <<EOF
+cat > /opt/forgetrack/.env.development <<ENVEOF
 NODE_ENV=development
 PORT=3000
 APP_NAME=ForgeTrack
@@ -58,7 +59,7 @@ JWT_SECRET=${JWT_SECRET}
 DB_PATH=/opt/forgetrack/data/forgetrack.db
 COOKIE_SECURE=false
 COOKIE_MAX_AGE_HOURS=72
-EOF
+ENVEOF
 msg_ok "Wrote environment configuration"
 
 msg_info "Running database migration"
@@ -66,7 +67,7 @@ NODE_ENV=development node /opt/forgetrack/server/db/migrate.js
 msg_ok "Database initialised"
 
 msg_info "Creating systemd service"
-cat > /etc/systemd/system/forgetrack.service <<EOF
+cat > /etc/systemd/system/forgetrack.service <<SVCEOF
 [Unit]
 Description=ForgeTrack Issue Tracker
 Documentation=https://github.com/loucas781/ForgeTrack
@@ -86,16 +87,15 @@ SyslogIdentifier=forgetrack
 
 [Install]
 WantedBy=multi-user.target
-EOF
+SVCEOF
 systemctl enable -q --now forgetrack
 msg_ok "Created and started ForgeTrack service"
 
-msg_info "Writing update helper script"
-cat > /opt/forgetrack/update.sh <<'UPDATESCRIPT'
+msg_info "Writing update helper"
+cat > /opt/forgetrack/update.sh <<'UPDATEEOF'
 #!/usr/bin/env bash
-# ForgeTrack update script — pull latest from develop and restart
 set -e
-echo "Pulling latest from develop branch..."
+echo "Pulling latest from develop..."
 cd /opt/forgetrack
 git pull origin develop
 echo "Installing dependencies..."
@@ -104,11 +104,10 @@ echo "Running database migration..."
 NODE_ENV=development node server/db/migrate.js
 echo "Restarting service..."
 systemctl restart forgetrack
-echo "Done! ForgeTrack is running on http://localhost:3000"
-UPDATESCRIPT
+echo "Done! ForgeTrack running at http://localhost:3000"
+UPDATEEOF
 chmod +x /opt/forgetrack/update.sh
 msg_ok "Created update script at /opt/forgetrack/update.sh"
 
 motd_ssh
 customize
-cleanup_lxc

@@ -634,3 +634,16 @@ select.form-control {
   .ir-labels { display: none; }
   .search-result-project { display: none; }
 }
+
+/* ── Version chip (topbar) ──────────────────────────────────────────── */
+.topbar-version {
+  font-size: 11px; font-weight: 600; font-family: var(--mono);
+  color: rgba(255,255,255,.45);
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px; padding: 2px 8px;
+  flex-shrink: 0; white-space: nowrap;
+  transition: color var(--t-fast);
+}
+.topbar-version:hover { color: rgba(255,255,255,.75); }
+@media (max-width: 600px) { .topbar-version { display: none; } }
