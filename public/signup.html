@@ -43,7 +43,7 @@
 
       <div class="form-group">
         <label class="form-label req" for="email">Email address</label>
-        <input class="form-control" type="email" id="email" name="email" autocomplete="email" placeholder="you@example.com" />
+        <input class="form-control" type="text" id="email" name="email" autocomplete="email" placeholder="you@example.com" inputmode="email" />
         <span class="form-error hidden" id="err-email"></span>
       </div>
 
@@ -125,8 +125,9 @@
       submitBtn.textContent = 'Creating account…'
       try {
         const res  = await fetch('/api/auth/signup', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ name, email, password }) })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Signup failed')
+        let data
+        try { data = await res.json() } catch { throw new Error(`Server error (HTTP ${res.status}) — check server logs`) }
+        if (!res.ok) throw new Error(data.error || `Signup failed (${res.status})`)
         window.location.href = '/'
       } catch (err) {
         errEl.textContent = err.message
