@@ -67,6 +67,38 @@ function buildTopbarHTML() {
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
 
+        <!-- Theme toggle -->
+        <div class="dropdown" id="theme-dropdown-wrap" style="position:relative">
+          <button class="theme-toggle-btn" id="theme-toggle-btn" title="Change theme">
+            <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:none"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+            <svg id="theme-icon-oled" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            <svg id="theme-icon-system" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </button>
+          <div class="theme-picker" id="theme-picker">
+            <button class="theme-picker-item" data-theme-choice="system">
+              <span class="theme-picker-swatch" style="background:linear-gradient(135deg,#fff 50%,#1e2535 50%)"></span>
+              System
+              <svg class="theme-picker-check" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+            </button>
+            <button class="theme-picker-item" data-theme-choice="light">
+              <span class="theme-picker-swatch" style="background:#f4f5f7;border-color:#dfe1e6"></span>
+              Light
+              <svg class="theme-picker-check" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+            </button>
+            <button class="theme-picker-item" data-theme-choice="dark">
+              <span class="theme-picker-swatch" style="background:#1e2535;border-color:#2d3447"></span>
+              Dark
+              <svg class="theme-picker-check" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+            </button>
+            <button class="theme-picker-item" data-theme-choice="oled">
+              <span class="theme-picker-swatch" style="background:#000;border-color:#1a1a1a"></span>
+              OLED Black
+              <svg class="theme-picker-check" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+            </button>
+          </div>
+        </div>
+
         <div class="dropdown">
           <button class="topbar-avatar-btn" id="user-avatar-btn"></button>
           <div class="dropdown-menu dropdown-menu-r" id="user-menu">
@@ -427,3 +459,89 @@ function globalModalsHTML() {
       </div>
     </div>`
 }
+
+// ── Theme Engine ──────────────────────────────────────────────────────────────
+// Runs immediately so theme is applied before first paint (no flash)
+;(function() {
+  const STORAGE_KEY = 'ft-theme'
+  const ICONS = {
+    system: 'theme-icon-system',
+    light:  'theme-icon-sun',
+    dark:   'theme-icon-moon',
+    oled:   'theme-icon-oled',
+  }
+
+  function getStored() {
+    try { return localStorage.getItem(STORAGE_KEY) || 'system' } catch { return 'system' }
+  }
+
+  function applyTheme(choice, animate) {
+    const html = document.documentElement
+    if (animate) {
+      html.classList.add('theme-transitioning')
+      setTimeout(() => html.classList.remove('theme-transitioning'), 400)
+    }
+    if (choice === 'system') {
+      html.removeAttribute('data-theme')
+    } else {
+      html.setAttribute('data-theme', choice)
+    }
+    // Update icon
+    Object.values(ICONS).forEach(id => {
+      const el = document.getElementById(id)
+      if (el) el.style.display = 'none'
+    })
+    const iconId = ICONS[choice] || ICONS.system
+    const icon = document.getElementById(iconId)
+    if (icon) icon.style.display = ''
+
+    // Update picker active state
+    document.querySelectorAll('.theme-picker-item').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.themeChoice === choice)
+    })
+  }
+
+  function saveAndApply(choice, animate) {
+    try { localStorage.setItem(STORAGE_KEY, choice) } catch {}
+    applyTheme(choice, animate)
+  }
+
+  // Apply immediately on load (no animation)
+  applyTheme(getStored(), false)
+
+  // Wire up after DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn     = document.getElementById('theme-toggle-btn')
+    const picker  = document.getElementById('theme-picker')
+    if (!btn || !picker) return
+
+    // Re-apply to update icons/active state after DOM exists
+    applyTheme(getStored(), false)
+
+    // Toggle picker open/close
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      picker.classList.toggle('show')
+    })
+
+    // Pick a theme
+    picker.addEventListener('click', e => {
+      const item = e.target.closest('[data-theme-choice]')
+      if (!item) return
+      saveAndApply(item.dataset.themeChoice, true)
+      picker.classList.remove('show')
+    })
+
+    // Close picker on outside click
+    document.addEventListener('click', e => {
+      if (!document.getElementById('theme-dropdown-wrap')?.contains(e.target)) {
+        picker.classList.remove('show')
+      }
+    })
+
+    // Follow OS preference changes when in system mode
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (getStored() === 'system') applyTheme('system', true)
+    })
+  })
+})()

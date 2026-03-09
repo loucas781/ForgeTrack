@@ -76,21 +76,9 @@ app.use('/api/issues',   require('./routes/issues'))
 app.use('/api/users',    require('./routes/users'))
 
 // ── Page routing — serve HTML files, guard protected pages ────────────────────
-// Public pages — redirect to dashboard if already logged in
-app.get(['/login.html', '/signup.html'], (req, res) => {
-  const token = req.cookies?.token
-  if (token) {
-    try {
-      const jwt = require('jsonwebtoken')
-      jwt.verify(token, process.env.JWT_SECRET)
-      return res.redirect('/')   // already logged in → go to dashboard
-    } catch {
-      res.clearCookie('token')
-    }
-  }
-  const file = req.path === '/login.html' ? 'login.html' : 'signup.html'
-  res.sendFile(path.join(__dirname, '../public', file))
-})
+// Public pages — served as-is, client JS handles redirect if already logged in
+app.get('/login.html',  (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')))
+app.get('/signup.html', (req, res) => res.sendFile(path.join(__dirname, '../public/signup.html')))
 
 // Protected pages — redirect to login if no valid token
 app.get(['/', '/index.html'],  requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')))
