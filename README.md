@@ -261,7 +261,7 @@ ForgeTrack includes a Proxmox helper script that follows the same pattern as [co
 Run this from your **Proxmox host shell**:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeTrack/develop/proxmox/ct/forgetrack.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeTrack/staging/proxmox/ct/forgetrack.sh)"
 ```
 
 This presents the standard interactive UI for choosing container settings (ID, hostname, IP, storage, password, etc.) before doing anything.
