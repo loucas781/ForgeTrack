@@ -557,6 +557,8 @@ select.form-control {
   .topbar-center { display: none; }
   .topbar-icon-btn { display: none; }
   .topbar-logo-text { display: none; } /* show only icon on very small screens */
+  /* Hide hamburger on mobile — bottom nav "More" button handles the sidebar */
+  .topbar-menu-btn { display: none !important; }
 
   /* Avatar button stays visible */
   .topbar-right { gap: 4px; }

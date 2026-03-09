@@ -65,24 +65,24 @@ Open http://localhost:3000 — you'll be redirected to sign up for the first acc
 
 ## Configuration
 
-Each environment has its own `.env.*` file:
+`.env.*` files are **never committed to git** — they contain secrets. The install script generates the correct file automatically on each server.
 
-| File | Used when |
-|------|-----------|
-| `.env.development` | `NODE_ENV=development` (default for `npm run dev`) |
-| `.env.staging`     | `NODE_ENV=staging` |
-| `.env.production`  | `NODE_ENV=production` |
+For local development, copy the example and fill in your values:
 
-### Key settings
-
-```env
-PORT=3000
-JWT_SECRET=your-long-random-string    # CHANGE THIS in production!
-DB_PATH=./data/forgetrack.db        # Path to SQLite database file
-COOKIE_SECURE=false                   # Set true when using HTTPS
-COOKIE_MAX_AGE_HOURS=72               # Session duration
-APP_ENV=development                   # Controls env badge display
+```bash
+cp .env.example .env.development
+# then edit .env.development with your local DB credentials
 ```
+
+The app loads the env file matching `NODE_ENV`:
+
+| Environment | File loaded | Set by |
+|-------------|-------------|--------|
+| `development` | `.env.development` | Install script / manual |
+| `staging`     | `.env.staging`     | Install script (pass `staging` arg) |
+| `production`  | `.env.production`  | Install script (pass `production` arg) |
+
+See `.env.example` in the repo for all available variables and their descriptions.
 
 ### Generate a secure JWT secret
 ```bash
@@ -242,9 +242,7 @@ forgetrack/
 │   └── install/
 │       └── forgetrack-install.sh  # Runs inside container — installs the app
 ├── data/                      # SQLite database files (git-ignored)
-├── .env.development
-├── .env.staging
-├── .env.production
+├── .env.example          # template — copy and fill in, never commit real values
 ├── .gitignore
 ├── .github/workflows/deploy.yml
 └── package.json
