@@ -5,7 +5,7 @@ function buildTopbarHTML() {
   return `
     <header class="topbar">
 
-      <!-- Left: hamburger (mobile/tablet) + logo + nav -->
+      <!-- Left: hamburger (only shown inside project pages via CSS) + logo + nav -->
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <button class="topbar-menu-btn" id="sidebar-toggle" title="Menu" aria-label="Toggle menu">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -21,10 +21,15 @@ function buildTopbarHTML() {
         </a>
 
         <nav class="topbar-nav">
-          <button class="topbar-nav-btn" onclick="location.href='/'">
-            Projects
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          <div class="dropdown">
+            <button class="topbar-nav-btn" id="topbar-projects-btn">
+              Projects
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="dropdown-menu" id="topbar-projects-menu" style="min-width:220px;top:calc(100% + 6px);left:0">
+              <div class="dropdown-header text-2" style="font-size:12px">Loading…</div>
+            </div>
+          </div>
         </nav>
       </div>
 
@@ -275,11 +280,11 @@ function initMobileInteractions() {
   sidebarToggle?.addEventListener('click', () => {
     if (sidebarEl) {
       sidebarEl.classList.contains('open') ? closeSidebar() : openSidebar()
-    } else {
-      // No project sidebar — hamburger goes to home on dashboard
-      location.href = '/'
     }
+    // No-op if no sidebar (dashboard/settings/profile — hamburger is hidden anyway)
   })
+  // Hide hamburger if there's no sidebar on this page
+  if (!sidebarEl && sidebarToggle) sidebarToggle.style.display = 'none'
   sidebarClose?.addEventListener('click', closeSidebar)
   overlayEl?.addEventListener('click', closeSidebar)
   bottomSidebarBtn?.addEventListener('click', openSidebar)

@@ -154,10 +154,45 @@ async function initTopbar() {
   if (logoEl && config.appEnv && config.appEnv !== 'production') {
     logoEl.insertAdjacentHTML('afterend', `<span class="env-chip ${config.appEnv}">${config.appEnv}</span>`)
   }
-  // Corner badge
+  // Corner badge — only show on desktop (bottom nav overlaps on mobile)
   const corner = document.getElementById('env-corner')
   if (corner && config.appEnv && config.appEnv !== 'production') {
     corner.innerHTML = `<span class="env-chip ${config.appEnv}">${config.appEnv}</span>`
+    corner.style.display = window.innerWidth <= 600 ? 'none' : ''
+    window.addEventListener('resize', () => {
+      corner.style.display = window.innerWidth <= 600 ? 'none' : ''
+    })
+  }
+
+  // Projects dropdown in topbar
+  const projNavBtn = document.getElementById('topbar-projects-btn')
+  const projMenu   = document.getElementById('topbar-projects-menu')
+  if (projNavBtn && projMenu) {
+    try {
+      const projects = await GET('/projects')
+      projMenu.innerHTML = projects.length
+        ? projects.map(p => `
+            <a class="dropdown-item" href="/project.html?id=${p.id}&view=issues" style="text-decoration:none">
+              ${projectIcon(p, 18)}
+              <span>${esc(p.name)}</span>
+              <span class="mono text-3" style="font-size:11px;margin-left:auto">${esc(p.key)}</span>
+            </a>`).join('')
+          + `<hr class="dropdown-divider"/>
+             <button class="dropdown-item" id="proj-menu-new">
+               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+               New Project
+             </button>`
+        : `<div class="dropdown-header text-2" style="font-size:12px">No projects yet</div>
+           <button class="dropdown-item" id="proj-menu-new">
+             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+             New Project
+           </button>`
+      projNavBtn.addEventListener('click', () => toggleDropdown(projMenu))
+      projMenu.querySelector('#proj-menu-new')?.addEventListener('click', () => {
+        projMenu.classList.remove('show')
+        openModal('create-project-modal')
+      })
+    } catch {}
   }
 
   // User menu

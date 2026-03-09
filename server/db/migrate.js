@@ -104,8 +104,22 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_comments_issue  ON comments(issue_id);
       CREATE INDEX IF NOT EXISTS idx_labels_issue    ON issue_labels(issue_id);
 
+      -- ── Issue attachments ─────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS issue_attachments (
+        id          TEXT PRIMARY KEY,
+        issue_id    TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+        uploader_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        filename    TEXT NOT NULL,
+        mime_type   TEXT NOT NULL,
+        data        TEXT NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_attachments_issue ON issue_attachments(issue_id);
+
       -- ── Migrations for existing installs ─────────────────────────────
       ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 
     `)
     console.log('✓ PostgreSQL schema ready')

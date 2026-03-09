@@ -3,6 +3,7 @@ const router  = require('express').Router()
 const bcrypt  = require('bcryptjs')
 const jwt     = require('jsonwebtoken')
 const { v4: uuidv4 } = require('uuid')
+const { authenticator } = require('otplib')
 const db      = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 
@@ -155,6 +156,62 @@ router.patch('/profile', requireAuth, async (req, res) => {
     res.json({ ok: true, user: updated })
   } catch (err) {
     console.error('profile:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── 2FA status ────────────────────────────────────────────────────────────────
+router.get('/2fa/status', requireAuth, async (req, res) => {
+  try {
+    const { rows: [user] } = await db.query('SELECT totp_enabled FROM users WHERE id = $1', [req.user.id])
+    res.json({ enabled: !!user?.totp_enabled })
+  } catch { res.status(500).json({ error: 'Server error' }) }
+})
+
+// ── 2FA setup — generate secret ───────────────────────────────────────────────
+router.post('/2fa/setup', requireAuth, async (req, res) => {
+  try {
+    const secret  = authenticator.generateSecret()
+    const appName = process.env.APP_NAME || 'ForgeTrack'
+    const { rows: [user] } = await db.query('SELECT email FROM users WHERE id = $1', [req.user.id])
+    const otpauth = authenticator.keyuri(user.email, appName, secret)
+    // Store pending secret (not yet confirmed)
+    await db.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secret, req.user.id])
+    res.json({ secret, otpauth })
+  } catch (err) {
+    console.error('2fa setup:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── 2FA verify + enable ───────────────────────────────────────────────────────
+router.post('/2fa/verify', requireAuth, async (req, res) => {
+  const { secret, code } = req.body
+  if (!secret || !code) return res.status(400).json({ error: 'Secret and code required' })
+  try {
+    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret })
+    if (!valid) return res.status(400).json({ error: 'Invalid code — try again' })
+    await db.query('UPDATE users SET totp_secret = $1, totp_enabled = TRUE WHERE id = $2', [secret, req.user.id])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('2fa verify:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── 2FA disable ───────────────────────────────────────────────────────────────
+router.post('/2fa/disable', requireAuth, async (req, res) => {
+  const { code } = req.body
+  if (!code) return res.status(400).json({ error: 'Code required' })
+  try {
+    const { rows: [user] } = await db.query('SELECT totp_secret FROM users WHERE id = $1', [req.user.id])
+    if (!user?.totp_secret) return res.status(400).json({ error: '2FA is not set up' })
+    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret: user.totp_secret })
+    if (!valid) return res.status(400).json({ error: 'Invalid code' })
+    await db.query('UPDATE users SET totp_secret = NULL, totp_enabled = FALSE WHERE id = $1', [req.user.id])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('2fa disable:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })

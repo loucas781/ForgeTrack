@@ -83,6 +83,20 @@
                 <div class="inline-edit" id="desc-edit" style="font-size:14px;line-height:1.6;color:var(--text-2);white-space:pre-wrap;min-height:40px" title="Click to edit">${esc(iss.description||'Click to add a description…')}<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
               </section>
 
+              <!-- Attachments -->
+              <section style="margin-bottom:24px">
+                <h4 style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border-2);padding-bottom:8px;margin-bottom:16px">
+                  Attachments <span id="attach-count"></span>
+                </h4>
+                <div id="attachments-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px"></div>
+                <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text-2);padding:6px 12px;border:1px dashed var(--border-2);border-radius:var(--r-md);transition:border-color var(--t-fast),color var(--t-fast)" id="attach-label">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                  Attach photo or file
+                  <input type="file" id="attach-input" accept="image/*,.pdf,.txt,.csv" multiple style="display:none" />
+                </label>
+                <div id="attach-uploading" style="display:none;font-size:12px;color:var(--text-3);margin-top:6px">Uploading…</div>
+              </section>
+
               <!-- Comments -->
               <section>
                 <h4 style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border-2);padding-bottom:8px;margin-bottom:16px">Activity (${iss.comments?.length||0} comments)</h4>
@@ -219,6 +233,59 @@
         await PATCH('/issues/' + issueId, { description: val })
       })
 
+      // Load + render attachments
+      async function loadAttachments() {
+        try {
+          const atts = await GET(`/issues/${issueId}/attachments`)
+          const list  = document.getElementById('attachments-list')
+          const count = document.getElementById('attach-count')
+          if (count) count.textContent = atts.length ? `(${atts.length})` : ''
+          if (!list) return
+          list.innerHTML = atts.map(a => {
+            const isImg = a.mime_type.startsWith('image/')
+            return `
+              <div class="attachment-thumb" data-aid="${esc(a.id)}" title="${esc(a.filename)}"
+                   style="position:relative;border:1px solid var(--border-2);border-radius:var(--r-md);overflow:hidden;width:90px;background:var(--gray-50)">
+                ${isImg
+                  ? `<img src="/api/issues/${issueId}/attachments/${a.id}/data"
+                          style="width:90px;height:70px;object-fit:cover;display:block;cursor:pointer"
+                          onclick="window.open(this.src,'_blank')" />`
+                  : `<div style="width:90px;height:70px;display:flex;align-items:center;justify-content:center;cursor:pointer"
+                          onclick="window.open('/api/issues/${issueId}/attachments/${a.id}/data','_blank')">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" stroke="var(--text-3)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                     </div>`}
+                <div style="padding:3px 5px;font-size:10px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.filename)}</div>
+                <button onclick="deleteAttachment('${esc(a.id)}')" title="Remove"
+                        style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.5);border:none;color:#fff;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;line-height:1;padding:0">×</button>
+              </div>`
+          }).join('')
+        } catch {}
+      }
+      await loadAttachments()
+
+      // Upload attachment
+      document.getElementById('attach-input')?.addEventListener('change', async e => {
+        const files = Array.from(e.target.files)
+        if (!files.length) return
+        const uploading = document.getElementById('attach-uploading')
+        if (uploading) uploading.style.display = 'block'
+        for (const file of files) {
+          if (file.size > 4 * 1024 * 1024) { toast(`${file.name} exceeds 4MB limit`, 'error'); continue }
+          try {
+            const data = await new Promise((res, rej) => {
+              const r = new FileReader()
+              r.onload = ev => res(ev.target.result)
+              r.onerror = () => rej(new Error('Read failed'))
+              r.readAsDataURL(file)
+            })
+            await POST(`/issues/${issueId}/attachments`, { filename: file.name, mime_type: file.type || 'application/octet-stream', data })
+          } catch (err) { toast(err.message, 'error') }
+        }
+        e.target.value = ''
+        if (uploading) uploading.style.display = 'none'
+        await loadAttachments()
+      })
+
       // Submit comment
       document.getElementById('submit-comment-btn')?.addEventListener('click', async () => {
         const body = document.getElementById('comment-input').value.trim()
@@ -297,6 +364,19 @@
       openModal('create-project-modal')
     })
   })()
+
+  async function deleteAttachment(attachId) {
+    const issueId = new URLSearchParams(location.search).get('id')
+    if (!issueId) return
+    try {
+      await DELETE(`/issues/${issueId}/attachments/${attachId}`)
+      const el = document.querySelector(`[data-aid="${attachId}"]`)
+      el?.remove()
+      const list  = document.getElementById('attachments-list')
+      const count = document.getElementById('attach-count')
+      if (count && list) count.textContent = list.children.length ? `(${list.children.length})` : ''
+    } catch (err) { toast(err.message, 'error') }
+  }
 
   async function deleteComment(issueId, commentId, btn) {
     try {

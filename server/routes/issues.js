@@ -240,4 +240,71 @@ router.delete('/:id/comments/:cid', async (req, res) => {
   }
 })
 
+// ── Attachments ───────────────────────────────────────────────────────────────
+// GET /api/issues/:id/attachments
+router.get('/:id/attachments', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT a.id, a.filename, a.mime_type, a.created_at,
+              u.name AS uploader_name, u.initials AS uploader_initials, u.color AS uploader_color
+       FROM issue_attachments a
+       LEFT JOIN users u ON u.id = a.uploader_id
+       WHERE a.issue_id = $1 ORDER BY a.created_at ASC`,
+      [req.params.id]
+    )
+    res.json(rows)
+  } catch { res.status(500).json({ error: 'Server error' }) }
+})
+
+// GET /api/issues/:id/attachments/:aid/data  — return raw base64 data for display
+router.get('/:id/attachments/:aid/data', requireAuth, async (req, res) => {
+  try {
+    const { rows: [row] } = await db.query(
+      'SELECT filename, mime_type, data FROM issue_attachments WHERE id = $1 AND issue_id = $2',
+      [req.params.aid, req.params.id]
+    )
+    if (!row) return res.status(404).json({ error: 'Not found' })
+    const buf = Buffer.from(row.data.split(',')[1] || row.data, 'base64')
+    res.set('Content-Type', row.mime_type)
+    res.set('Content-Disposition', `inline; filename="${row.filename}"`)
+    res.send(buf)
+  } catch { res.status(500).json({ error: 'Server error' }) }
+})
+
+// POST /api/issues/:id/attachments
+router.post('/:id/attachments', requireAuth, async (req, res) => {
+  const { filename, mime_type, data } = req.body
+  if (!filename || !mime_type || !data) return res.status(400).json({ error: 'filename, mime_type and data required' })
+  if (data.length > 6 * 1024 * 1024) return res.status(413).json({ error: 'File too large (max 4MB)' })
+  try {
+    const { rows: [issue] } = await db.query('SELECT id FROM issues WHERE id = $1', [req.params.id])
+    if (!issue) return res.status(404).json({ error: 'Issue not found' })
+    const { v4: uuidv4 } = require('uuid')
+    const id = uuidv4()
+    await db.query(
+      'INSERT INTO issue_attachments (id, issue_id, uploader_id, filename, mime_type, data) VALUES ($1,$2,$3,$4,$5,$6)',
+      [id, req.params.id, req.user.id, filename, mime_type, data]
+    )
+    res.status(201).json({ id, filename, mime_type })
+  } catch (err) {
+    console.error('attachment upload:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// DELETE /api/issues/:id/attachments/:aid
+router.delete('/:id/attachments/:aid', requireAuth, async (req, res) => {
+  try {
+    const { rows: [row] } = await db.query(
+      'SELECT uploader_id FROM issue_attachments WHERE id = $1 AND issue_id = $2',
+      [req.params.aid, req.params.id]
+    )
+    if (!row) return res.status(404).json({ error: 'Not found' })
+    if (row.uploader_id !== req.user.id && req.user.role !== 'admin')
+      return res.status(403).json({ error: 'Cannot delete another user\'s attachment' })
+    await db.query('DELETE FROM issue_attachments WHERE id = $1', [req.params.aid])
+    res.json({ ok: true })
+  } catch { res.status(500).json({ error: 'Server error' }) }
+})
+
 module.exports = router
