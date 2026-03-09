@@ -552,7 +552,8 @@ select.form-control {
 /* ── Mobile (≤600px) ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
 
-  /* Topbar: hide search and settings icon, show hamburger */
+  /* Topbar: push left and right groups to edges */
+  .topbar { justify-content: space-between; }
   .topbar-center { display: none; }
   .topbar-icon-btn { display: none; }
   .topbar-logo-text { display: none; } /* show only icon on very small screens */

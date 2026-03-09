@@ -9,12 +9,15 @@
   <link rel="stylesheet" href="/css/main.css" />
   <script>!function(){var t=localStorage.getItem("ft-theme")||"system";t!=="system"&&document.documentElement.setAttribute("data-theme",t)}()</script>
   <style>
+    .settings-tabs-wrap {
+      flex-shrink: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-2);
+    }
     /* Tab bar — horizontal scroll on mobile */
     .settings-tabs {
       display: flex; gap: 0; overflow-x: auto; scrollbar-width: none;
-      border-bottom: 1px solid var(--border-2);
-      background: var(--surface); padding: 0 16px;
-      position: sticky; top: var(--topbar-h); z-index: 10;
+      padding: 0 16px;
     }
     .settings-tabs::-webkit-scrollbar { display: none; }
     .settings-tab {
@@ -74,9 +77,37 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
   (async () => {
+    const TABS = [
+      { id:'appearance', label:'Appearance', icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
+      { id:'team',       label:'Team',       icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
+      { id:'security',   label:'Security',   icon:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+      { id:'build',      label:'Build Info', icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+    ]
+
     injectShell()
     await initTopbar()
     document.title = 'Settings — ForgeTrack'
+
+    // Inject tab bar as a sibling of page-content so it doesn't scroll
+    const appBody = document.querySelector('.app-body')
+    const pageContent = document.getElementById('page-content')
+    const tabBar = document.createElement('div')
+    tabBar.className = 'settings-tabs-wrap'
+    tabBar.innerHTML = `
+      <div class="settings-tabs" id="settings-tabs">
+        ${TABS.map((t,i) => `
+          <button class="settings-tab${i===0?' active':''}" data-panel="${t.id}">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">${t.icon}</svg>
+            ${t.label}
+          </button>`).join('')}
+      </div>`
+    // Insert tab bar between topbar and page-content (wrapping app-body contents)
+    if (appBody && pageContent) {
+      // Restructure: app-body → [tab-bar + page-content vertically]
+      appBody.style.flexDirection = 'column'
+      appBody.insertBefore(tabBar, pageContent)
+    }
+
     const content = document.getElementById('page-content')
     const [config, users, projects, issues] = await Promise.all([GET('/config'), GET('/users'), GET('/projects'), GET('/issues')])
     const me = config.user
@@ -88,23 +119,8 @@
     const vColor = isDev ? 'var(--orange)' : isRC ? 'var(--brand)' : 'var(--green)'
     const vLabel = isDev ? `dev build #${devNum}` : isRC ? 'release candidate' : 'stable release'
 
-    const TABS = [
-      { id:'appearance', label:'Appearance', icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
-      { id:'team',       label:'Team',       icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
-      { id:'security',   label:'Security',   icon:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
-      { id:'build',      label:'Build Info', icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
-    ]
 
     content.innerHTML = `
-      <div class="settings-tabs" id="settings-tabs">
-        ${TABS.map((t,i) => `
-          <button class="settings-tab${i===0?' active':''}" data-panel="${t.id}">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">${t.icon}</svg>
-            ${t.label}
-          </button>`).join('')}
-      </div>
-
-      <!-- Appearance -->
       <div class="settings-panel active" id="panel-appearance">
         <div class="card section-card">
           <h3 class="section-title">Colour scheme</h3>
@@ -218,12 +234,12 @@
 
     // ── Tab switching ──────────────────────────────────────────────
     function switchTab(id) {
-      document.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.panel === id))
+      tabBar.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.panel === id))
       document.querySelectorAll('.settings-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + id))
       history.replaceState(null, '', '#' + id)
       if (id === 'security') renderTwoFA()
     }
-    document.querySelectorAll('.settings-tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.panel)))
+    tabBar.querySelectorAll('.settings-tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.panel)))
     const hash = location.hash.replace('#', '')
     if (hash && TABS.find(t => t.id === hash)) switchTab(hash)
 
