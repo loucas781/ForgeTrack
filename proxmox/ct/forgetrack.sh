@@ -311,7 +311,9 @@ done
 echo ""
 msg_info "Running ForgeTrack install script"
 echo ""
-pct exec "$CTID" -- bash -c "$(curl -fsSL ${INSTALL_URL}) ${APP_ENV}"
+# Download install script to host, then push it into the container with APP_ENV as argument
+INSTALL_SCRIPT=$(curl -fsSL ${INSTALL_URL})
+pct exec "$CTID" -- bash -c "${INSTALL_SCRIPT}" -- "${APP_ENV}"
 echo ""
 msg_ok "ForgeTrack installed"
 
