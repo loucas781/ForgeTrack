@@ -86,6 +86,7 @@ APP_ENV=development
 JWT_SECRET=${JWT_SECRET}
 DATABASE_URL=postgresql://forgetrack:${DB_PASS}@localhost:5432/forgetrack
 COOKIE_SECURE=false
+TRUST_PROXY=false
 COOKIE_MAX_AGE_HOURS=72
 ENVEOF
 msg_ok "Configuration written"

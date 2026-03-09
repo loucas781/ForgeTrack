@@ -13,8 +13,15 @@ function getInitials(name) {
 }
 
 function cookieOpts() {
-  const hours = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72')
-  return { httpOnly: true, secure: process.env.COOKIE_SECURE === 'true', sameSite: 'lax', maxAge: hours * 60 * 60 * 1000 }
+  const hours  = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72')
+  const secure = process.env.COOKIE_SECURE === 'true'
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? 'strict' : 'lax',
+    maxAge:   hours * 60 * 60 * 1000,
+    path:     '/',
+  }
 }
 
 function makeToken(user) {

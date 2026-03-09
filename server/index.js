@@ -40,9 +40,9 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
 
-// Trust the first proxy (Nginx Proxy Manager) so real client IPs are used
-// for rate limiting rather than NPM's internal IP
-app.set('trust proxy', 1)
+// Trust proxy only when explicitly configured (i.e. behind Nginx Proxy Manager)
+// Accessing via direct IP without a proxy should not have this set
+if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1)
 
 // Rate limiting on auth endpoints
 // Keyed by real client IP — each user gets their own bucket
