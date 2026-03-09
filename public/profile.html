@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Profile — IssueTracker</title>
+  <title>Profile — ForgeTrack</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -18,7 +18,7 @@
     await initTopbar()
     const config = await GET('/config')
     const me = config.user
-    document.title = 'Profile — IssueTracker'
+    document.title = 'Profile — ForgeTrack'
     const content = document.getElementById('page-content')
     let selectedColor = me?.color || '#0052cc'
 

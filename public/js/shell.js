@@ -11,7 +11,7 @@ function buildTopbarHTML() {
             <path d="M7 17L12 7l2 4-2 2 5 4H7z" fill="white" opacity="0.9"/>
             <path d="M12 7l5 10H12l-2-4 2-2V7z" fill="white" opacity="0.6"/>
           </svg>
-          <span class="topbar-logo-text" id="topbar-logo-text">IssueTracker</span>
+          <span class="topbar-logo-text" id="topbar-logo-text">ForgeTrack</span>
         </a>
         <nav class="topbar-nav">
           <button class="topbar-nav-btn" onclick="location.href='/'">

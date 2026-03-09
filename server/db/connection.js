@@ -3,7 +3,7 @@ const Database = require('better-sqlite3')
 const path     = require('path')
 const fs       = require('fs')
 
-const DB_PATH = process.env.DB_PATH || './data/issuetracker.db'
+const DB_PATH = process.env.DB_PATH || './data/forgetrack.db'
 const resolved = path.resolve(DB_PATH)
 
 // Ensure directory exists

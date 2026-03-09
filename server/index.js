@@ -43,7 +43,7 @@ app.use(express.static(path.join(__dirname, '../public')))
 // Inject APP_ENV into page responses via a small config endpoint
 app.get('/api/config', optionalAuth, (req, res) => {
   res.json({
-    appName: process.env.APP_NAME || 'IssueTracker',
+    appName: process.env.APP_NAME || 'ForgeTrack',
     appEnv:  process.env.APP_ENV  || env,
     version: require('../package.json').version,
     user:    req.user || null,
@@ -85,5 +85,5 @@ app.use((err, req, res, next) => {
 // ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT || '3000')
 app.listen(PORT, () => {
-  console.log(`\n  IssueTracker [${env}] running at http://localhost:${PORT}\n`)
+  console.log(`\n  ForgeTrack [${env}] running at http://localhost:${PORT}\n`)
 })

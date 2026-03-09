@@ -1,4 +1,4 @@
-# IssueTracker v2
+# ForgeTrack v2
 
 A self-hosted issue tracking application — **vanilla HTML, CSS, and JavaScript** frontend with a **Node.js / Express** backend and **SQLite** database. No build step required.
 
@@ -78,7 +78,7 @@ Each environment has its own `.env.*` file:
 ```env
 PORT=3000
 JWT_SECRET=your-long-random-string    # CHANGE THIS in production!
-DB_PATH=./data/issuetracker.db        # Path to SQLite database file
+DB_PATH=./data/forgetrack.db        # Path to SQLite database file
 COOKIE_SECURE=false                   # Set true when using HTTPS
 COOKIE_MAX_AGE_HOURS=72               # Session duration
 APP_ENV=development                   # Controls env badge display
@@ -127,7 +127,7 @@ The app serves its own static files — just run `node server/index.js` and opti
 npm install -g pm2
 
 # Start
-NODE_ENV=production pm2 start server/index.js --name issuetracker
+NODE_ENV=production pm2 start server/index.js --name forgetrack
 
 # Auto-restart on reboot
 pm2 save
@@ -208,7 +208,7 @@ All endpoints require authentication via JWT cookie (set automatically on login)
 ## Project Structure
 
 ```
-issuetracker-v2/
+forgetrack-v2/
 ├── server/
 │   ├── index.js               # Express entry point
 │   ├── db/

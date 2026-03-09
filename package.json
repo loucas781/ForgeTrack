@@ -1,5 +1,5 @@
 {
-  "name": "issuetracker",
+  "name": "forgetrack",
   "version": "2.0.0",
   "description": "Self-hosted issue tracking — vanilla HTML/CSS/JS + Node.js/Express + SQLite",
   "main": "server/index.js",

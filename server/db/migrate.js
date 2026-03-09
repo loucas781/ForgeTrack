@@ -18,7 +18,7 @@ if (fs.existsSync(envFile)) {
   })
 }
 
-const DB_PATH = process.env.DB_PATH || './data/issuetracker.db'
+const DB_PATH = process.env.DB_PATH || './data/forgetrack.db'
 const dbDir   = path.dirname(path.resolve(DB_PATH))
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
 

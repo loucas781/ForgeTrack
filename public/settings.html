@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Settings — IssueTracker</title>
+  <title>Settings — ForgeTrack</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -16,7 +16,7 @@
   (async () => {
     injectShell()
     await initTopbar()
-    document.title = 'Settings — IssueTracker'
+    document.title = 'Settings — ForgeTrack'
     const content = document.getElementById('page-content')
     const [config, users, projects] = await Promise.all([GET('/config'), GET('/users'), GET('/projects')])
     const me = config.user
@@ -73,7 +73,7 @@
               <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Environment</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)"><span class="env-chip ${esc(config.appEnv)}">${esc(config.appEnv)}</span></td></tr>
               <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Projects</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)">${projects.length}</td></tr>
               <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Team Members</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)">${users.length}</td></tr>
-              <tr><td style="padding:8px 12px;color:var(--text-2)">Database</td><td style="padding:8px 12px">SQLite (${esc(process?.env?.DB_PATH||'./data/issuetracker.db')})</td></tr>
+              <tr><td style="padding:8px 12px;color:var(--text-2)">Database</td><td style="padding:8px 12px">SQLite (${esc(process?.env?.DB_PATH||'./data/forgetrack.db')})</td></tr>
             </tbody>
           </table>
         </div>
