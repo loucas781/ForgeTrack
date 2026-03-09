@@ -236,6 +236,11 @@ forgetrack-v2/
 │   ├── reports.html           # Project reports
 │   ├── profile.html           # User profile
 │   └── settings.html          # App settings
+├── proxmox/                   # Proxmox VE helper scripts
+│   ├── ct/
+│   │   └── forgetrack.sh      # Runs on Proxmox host — creates LXC container
+│   └── install/
+│       └── forgetrack-install.sh  # Runs inside container — installs the app
 ├── data/                      # SQLite database files (git-ignored)
 ├── .env.development
 ├── .env.staging
@@ -243,6 +248,41 @@ forgetrack-v2/
 ├── .gitignore
 ├── .github/workflows/deploy.yml
 └── package.json
+```
+
+---
+
+## Proxmox VE Deployment
+
+ForgeTrack includes a Proxmox helper script that follows the same pattern as [community-scripts/ProxmoxVE](https://community-scripts.github.io/ProxmoxVE/). It creates a Debian 12 LXC container, installs Node.js 20, clones the `develop` branch, and sets up a systemd service — all in one command.
+
+### One-line install
+
+Run this from your **Proxmox host shell**:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeTrack/develop/proxmox/ct/forgetrack.sh)"
+```
+
+This presents the standard interactive UI for choosing container settings (ID, hostname, IP, storage, password, etc.) before doing anything.
+
+### Default container settings
+
+| Setting | Value      |
+|---------|------------|
+| OS      | Debian 12  |
+| CPU     | 2 cores    |
+| RAM     | 1024 MB    |
+| Disk    | 8 GB       |
+| Port    | 3000       |
+
+### Updating
+
+Re-run the script on an existing container to pull the latest `develop` branch and restart, or run the update helper inside the container directly:
+
+```bash
+# From the Proxmox host
+pct exec <CTID> -- bash /opt/forgetrack/update.sh
 ```
 
 ---
