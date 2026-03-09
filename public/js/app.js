@@ -13,7 +13,7 @@ async function api(method, path, body) {
   const opts = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' }
   if (body !== undefined) opts.body = JSON.stringify(body)
   const res = await fetch('/api' + path, opts)
-  if (res.status === 401) { window.location.href = '/login.html'; return }
+  if (res.status === 401) { window.location.href = '/login.html'; throw new Error('Not authenticated') }
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Request failed')
   return data
@@ -43,6 +43,9 @@ function toast(msg, type = '') {
 function avatarHtml(user, size = 24) {
   if (!user) return ''
   const fs = Math.max(9, Math.round(size * 0.38))
+  if (user.avatar) {
+    return `<img src="${esc(user.avatar)}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;flex-shrink:0" title="${esc(user.name)}" />`
+  }
   return `<span class="avatar" style="width:${size}px;height:${size}px;background:${user.color||'#0052cc'};font-size:${fs}px" title="${esc(user.name)}">${esc(user.initials||'?')}</span>`
 }
 
@@ -137,15 +140,59 @@ async function initTopbar() {
   const config = await loadConfig()
   const user   = config.user
 
-  // Set env chip if not production
+  // Version + env chip next to logo
   const logoEl = document.getElementById('topbar-logo-text')
+  if (logoEl && config.version) {
+    const v       = config.version
+    const base    = v.split('-')[0]
+    const isDev   = v.includes('-dev.')
+    const devNum  = isDev ? v.split('-dev.')[1] : null
+    const label   = isDev ? `v${base} <span style="opacity:.6;font-weight:400;font-size:11px">dev.${devNum}</span>` : `v${base}`
+    logoEl.insertAdjacentHTML('afterend',
+      `<span class="topbar-version" title="${esc(v)}">${label}</span>`)
+  }
   if (logoEl && config.appEnv && config.appEnv !== 'production') {
     logoEl.insertAdjacentHTML('afterend', `<span class="env-chip ${config.appEnv}">${config.appEnv}</span>`)
   }
-  // Corner badge
+  // Corner badge — only show on desktop (bottom nav overlaps on mobile)
   const corner = document.getElementById('env-corner')
   if (corner && config.appEnv && config.appEnv !== 'production') {
     corner.innerHTML = `<span class="env-chip ${config.appEnv}">${config.appEnv}</span>`
+    corner.style.display = window.innerWidth <= 600 ? 'none' : ''
+    window.addEventListener('resize', () => {
+      corner.style.display = window.innerWidth <= 600 ? 'none' : ''
+    })
+  }
+
+  // Projects dropdown in topbar
+  const projNavBtn = document.getElementById('topbar-projects-btn')
+  const projMenu   = document.getElementById('topbar-projects-menu')
+  if (projNavBtn && projMenu) {
+    try {
+      const projects = await GET('/projects')
+      projMenu.innerHTML = projects.length
+        ? projects.map(p => `
+            <a class="dropdown-item" href="/project.html?id=${p.id}&view=issues" style="text-decoration:none">
+              ${projectIcon(p, 18)}
+              <span>${esc(p.name)}</span>
+              <span class="mono text-3" style="font-size:11px;margin-left:auto">${esc(p.key)}</span>
+            </a>`).join('')
+          + `<hr class="dropdown-divider"/>
+             <button class="dropdown-item" id="proj-menu-new">
+               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+               New Project
+             </button>`
+        : `<div class="dropdown-header text-2" style="font-size:12px">No projects yet</div>
+           <button class="dropdown-item" id="proj-menu-new">
+             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+             New Project
+           </button>`
+      projNavBtn.addEventListener('click', () => toggleDropdown(projMenu))
+      projMenu.querySelector('#proj-menu-new')?.addEventListener('click', () => {
+        projMenu.classList.remove('show')
+        openModal('create-project-modal')
+      })
+    } catch {}
   }
 
   // User menu
@@ -192,6 +239,7 @@ async function initTopbar() {
     })
     searchInput.addEventListener('blur', () => setTimeout(() => searchResults.classList.remove('show'), 200))
   }
+  initAttachmentPicker()
 }
 
 // ─── Issue row HTML ───────────────────────────────────────────────────────────
@@ -270,4 +318,73 @@ function setSidebarActive(href) {
   document.querySelectorAll('.sidebar-link').forEach(l => {
     l.classList.toggle('active', l.getAttribute('href') === href || l.getAttribute('data-match') === href)
   })
+}
+
+// ─── Create-issue modal: attachment preview & upload ─────────────────────────
+// Call once after modal HTML is in the DOM (initTopbar already does this).
+// Stored pending files live on the input element itself.
+function initAttachmentPicker() {
+  const input   = document.getElementById('ci-attachments')
+  const preview = document.getElementById('ci-attach-preview')
+  if (!input || !preview) return
+
+  // Keep a live array of validated File objects
+  if (!input._files) input._files = []
+
+  input.addEventListener('change', () => {
+    const MAX = 4 * 1024 * 1024
+    Array.from(input.files).forEach(file => {
+      if (file.size > MAX) { toast(`"${file.name}" exceeds 4 MB limit`, 'error'); return }
+      if (input._files.find(f => f.name === file.name && f.size === file.size)) return // dedupe
+      input._files.push(file)
+    })
+    input.value = '' // reset so same file can be re-added after removal
+    renderAttachPreviews()
+  })
+
+  function renderAttachPreviews() {
+    preview.innerHTML = input._files.map((f, idx) => {
+      const isImg = f.type.startsWith('image/')
+      const url   = isImg ? URL.createObjectURL(f) : null
+      return `<div style="position:relative;border:1px solid var(--border-2);border-radius:var(--r-md);overflow:hidden;width:80px;background:var(--gray-50)" data-idx="${idx}">
+        ${isImg
+          ? `<img src="${url}" style="width:80px;height:60px;object-fit:cover;display:block" />`
+          : `<div style="width:80px;height:60px;display:flex;align-items:center;justify-content:center">
+               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="var(--text-3)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+             </div>`}
+        <div style="padding:2px 4px;font-size:10px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.name)}</div>
+        <button type="button" onclick="removeAttachPreview(${idx})"
+          style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1">×</button>
+      </div>`
+    }).join('')
+  }
+
+  // Expose so inline onclick can reach it
+  window.removeAttachPreview = function(idx) {
+    input._files.splice(idx, 1)
+    renderAttachPreviews()
+  }
+}
+
+// Upload all pending attachments for a newly-created issue (fire-and-forget errors)
+async function uploadPendingAttachments(issueId) {
+  const input = document.getElementById('ci-attachments')
+  if (!input?._files?.length) return
+  for (const file of input._files) {
+    try {
+      const data = await new Promise((res, rej) => {
+        const r = new FileReader()
+        r.onload  = () => res(r.result)
+        r.onerror = () => rej(new Error('Read failed'))
+        r.readAsDataURL(file)
+      })
+      await POST(`/issues/${issueId}/attachments`, { filename: file.name, mime_type: file.type, data })
+    } catch (err) {
+      toast(`Failed to upload "${file.name}": ${err.message}`, 'error')
+    }
+  }
+  // Reset for next use
+  input._files = []
+  const preview = document.getElementById('ci-attach-preview')
+  if (preview) preview.innerHTML = ''
 }

@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/main.css" />
+  <script>!function(){var t=localStorage.getItem("ft-theme")||"system";t!=="system"&&document.documentElement.setAttribute("data-theme",t)}()</script>
 </head>
 <body>
   <div id="app-root"></div>
@@ -64,7 +65,7 @@
           <div class="card stat-card"><div class="stat-value">${pct}%</div><div class="stat-label">Completion</div></div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px">
+        <div class="reports-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px">
           <div class="card section-card"><h3 class="section-title">By Status</h3>${barChart(byStatus)}</div>
           <div class="card section-card"><h3 class="section-title">By Priority</h3>${barChart(byPriority)}</div>
           <div class="card section-card"><h3 class="section-title">By Type</h3>${barChart(byType)}</div>

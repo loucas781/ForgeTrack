@@ -3,6 +3,7 @@ const router  = require('express').Router()
 const bcrypt  = require('bcryptjs')
 const jwt     = require('jsonwebtoken')
 const { v4: uuidv4 } = require('uuid')
+const { authenticator } = require('otplib')
 const db      = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 
@@ -13,12 +14,14 @@ function getInitials(name) {
 }
 
 function cookieOpts() {
-  const hours = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72')
+  const hours  = parseInt(process.env.COOKIE_MAX_AGE_HOURS || '72')
+  const secure = process.env.COOKIE_SECURE === 'true'
   return {
     httpOnly: true,
-    secure:   process.env.COOKIE_SECURE === 'true',
-    sameSite: 'lax',
+    secure,
+    sameSite: secure ? 'strict' : 'lax',
     maxAge:   hours * 60 * 60 * 1000,
+    path:     '/',
   }
 }
 
@@ -31,53 +34,62 @@ function makeToken(user) {
 }
 
 // ── POST /api/auth/signup ─────────────────────────────────────────────────────
-router.post('/signup', (req, res) => {
-  const { name, email, password } = req.body
-  if (!name?.trim() || !email?.trim() || !password) {
-    return res.status(400).json({ error: 'All fields are required.' })
+router.post('/signup', async (req, res) => {
+  try {
+    const { name, email, password } = req.body
+    if (!name?.trim() || !email?.trim() || !password)
+      return res.status(400).json({ error: 'All fields are required.' })
+    if (password.length < 6)
+      return res.status(400).json({ error: 'Password must be at least 6 characters.' })
+    if (!/\S+@\S+\.\S+/.test(email))
+      return res.status(400).json({ error: 'Please enter a valid email address.' })
+
+    const norm = email.trim().toLowerCase()
+    const { rows: existing } = await db.query('SELECT id FROM users WHERE email = $1', [norm])
+    if (existing.length) return res.status(409).json({ error: 'An account with this email already exists.' })
+
+    const { rows: [{ count }] } = await db.query('SELECT COUNT(*)::int as count FROM users')
+    const hash     = await bcrypt.hash(password, 12)
+    const colorIdx = count % COLORS.length
+    const id       = uuidv4()
+
+    await db.query(
+      `INSERT INTO users (id, name, email, password, initials, color, role)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, name.trim(), norm, hash, getInitials(name), COLORS[colorIdx], count === 0 ? 'admin' : 'member']
+    )
+    const { rows: [user] } = await db.query(
+      'SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = $1', [id]
+    )
+    res.cookie('token', makeToken(user), cookieOpts())
+    res.json({ ok: true, user })
+  } catch (err) {
+    console.error('signup:', err.message)
+    res.status(500).json({ error: 'Server error' })
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters.' })
-  }
-  if (!/\S+@\S+\.\S+/.test(email)) {
-    return res.status(400).json({ error: 'Please enter a valid email address.' })
-  }
-
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.trim())
-  if (existing) return res.status(409).json({ error: 'An account with this email already exists.' })
-
-  const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c
-  const hash      = bcrypt.hashSync(password, 12)
-  const colorIdx  = userCount % COLORS.length
-  const id        = uuidv4()
-
-  db.prepare(`
-    INSERT INTO users (id, name, email, password, initials, color, role)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name.trim(), email.trim().toLowerCase(), hash, getInitials(name), COLORS[colorIdx], userCount === 0 ? 'admin' : 'member')
-
-  const user = db.prepare('SELECT id, name, email, initials, color, role FROM users WHERE id = ?').get(id)
-  res.cookie('token', makeToken(user), cookieOpts())
-  res.json({ ok: true, user })
 })
 
 // ── POST /api/auth/login ──────────────────────────────────────────────────────
-router.post('/login', (req, res) => {
-  const { email, password } = req.body
-  if (!email?.trim() || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' })
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+    if (!email?.trim() || !password)
+      return res.status(400).json({ error: 'Email and password are required.' })
+
+    const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email.trim().toLowerCase()])
+    if (!rows.length) return res.status(401).json({ error: 'No account found with this email address.' })
+
+    const user = rows[0]
+    if (!await bcrypt.compare(password, user.password))
+      return res.status(401).json({ error: 'Incorrect password.' })
+
+    const { password: _, ...pub } = user
+    res.cookie('token', makeToken(pub), cookieOpts())
+    res.json({ ok: true, user: pub })
+  } catch (err) {
+    console.error('login:', err.message)
+    res.status(500).json({ error: 'Server error' })
   }
-
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase())
-  if (!user) return res.status(401).json({ error: 'No account found with this email address.' })
-
-  if (!bcrypt.compareSync(password, user.password)) {
-    return res.status(401).json({ error: 'Incorrect password.' })
-  }
-
-  const { password: _, ...pub } = user
-  res.cookie('token', makeToken(pub), cookieOpts())
-  res.json({ ok: true, user: pub })
 })
 
 // ── POST /api/auth/logout ─────────────────────────────────────────────────────
@@ -87,46 +99,121 @@ router.post('/logout', (req, res) => {
 })
 
 // ── GET /api/auth/me ──────────────────────────────────────────────────────────
-router.get('/me', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT id, name, email, initials, color, role, created_at FROM users WHERE id = ?').get(req.user.id)
-  if (!user) return res.status(404).json({ error: 'User not found' })
-  res.json(user)
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, name, email, initials, color, avatar, role, created_at FROM users WHERE id = $1', [req.user.id]
+    )
+    if (!rows.length) return res.status(404).json({ error: 'User not found' })
+    res.json(rows[0])
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
 })
 
 // ── PATCH /api/auth/profile ───────────────────────────────────────────────────
-router.patch('/profile', requireAuth, (req, res) => {
-  const { name, email, color, currentPassword, newPassword } = req.body
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
-  if (!user) return res.status(404).json({ error: 'User not found' })
+router.patch('/profile', requireAuth, async (req, res) => {
+  try {
+    const { name, email, color, currentPassword, newPassword } = req.body
+    const { rows } = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id])
+    if (!rows.length) return res.status(404).json({ error: 'User not found' })
+    const user = rows[0]
 
-  const updates = {}
-  if (name?.trim())  { updates.name = name.trim(); updates.initials = getInitials(name.trim()) }
-  if (color)         { updates.color = color }
-  if (email?.trim()) {
-    const normalized = email.trim().toLowerCase()
-    if (normalized !== user.email) {
-      const clash = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(normalized, user.id)
-      if (clash) return res.status(409).json({ error: 'Email is already in use.' })
-      updates.email = normalized
+    const updates = {}
+    if (name?.trim())  { updates.name = name.trim(); updates.initials = getInitials(name.trim()) }
+    if (color)         { updates.color = color }
+    if (req.body.avatar !== undefined) { updates.avatar = req.body.avatar || null }
+    if (email?.trim()) {
+      const normalized = email.trim().toLowerCase()
+      if (normalized !== user.email) {
+        const { rows: clash } = await db.query(
+          'SELECT id FROM users WHERE email = $1 AND id != $2', [normalized, user.id]
+        )
+        if (clash.length) return res.status(409).json({ error: 'Email is already in use.' })
+        updates.email = normalized
+      }
     }
-  }
-  if (newPassword) {
-    if (!currentPassword) return res.status(400).json({ error: 'Current password is required.' })
-    if (!bcrypt.compareSync(currentPassword, user.password)) {
-      return res.status(401).json({ error: 'Current password is incorrect.' })
+    if (newPassword) {
+      if (!currentPassword) return res.status(400).json({ error: 'Current password is required.' })
+      if (!await bcrypt.compare(currentPassword, user.password))
+        return res.status(401).json({ error: 'Current password is incorrect.' })
+      if (newPassword.length < 6)
+        return res.status(400).json({ error: 'New password must be at least 6 characters.' })
+      updates.password = await bcrypt.hash(newPassword, 12)
     }
-    if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' })
-    updates.password = bcrypt.hashSync(newPassword, 12)
-  }
 
-  if (Object.keys(updates).length) {
-    const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ')
-    db.prepare(`UPDATE users SET ${setClauses} WHERE id = ?`).run(...Object.values(updates), user.id)
-  }
+    if (Object.keys(updates).length) {
+      const keys = Object.keys(updates)
+      const vals = Object.values(updates)
+      const set  = keys.map((k, i) => `${k} = $${i + 1}`).join(', ')
+      await db.query(`UPDATE users SET ${set} WHERE id = $${keys.length + 1}`, [...vals, user.id])
+    }
 
-  const updated = db.prepare('SELECT id, name, email, initials, color, role FROM users WHERE id = ?').get(user.id)
-  res.cookie('token', makeToken(updated), cookieOpts())
-  res.json({ ok: true, user: updated })
+    const { rows: [updated] } = await db.query(
+      'SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = $1', [user.id]
+    )
+    res.cookie('token', makeToken(updated), cookieOpts())
+    res.json({ ok: true, user: updated })
+  } catch (err) {
+    console.error('profile:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── 2FA status ────────────────────────────────────────────────────────────────
+router.get('/2fa/status', requireAuth, async (req, res) => {
+  try {
+    const { rows: [user] } = await db.query('SELECT totp_enabled FROM users WHERE id = $1', [req.user.id])
+    res.json({ enabled: !!user?.totp_enabled })
+  } catch { res.status(500).json({ error: 'Server error' }) }
+})
+
+// ── 2FA setup — generate secret ───────────────────────────────────────────────
+router.post('/2fa/setup', requireAuth, async (req, res) => {
+  try {
+    const secret  = authenticator.generateSecret()
+    const appName = process.env.APP_NAME || 'ForgeTrack'
+    const { rows: [user] } = await db.query('SELECT email FROM users WHERE id = $1', [req.user.id])
+    const otpauth = authenticator.keyuri(user.email, appName, secret)
+    // Store pending secret (not yet confirmed)
+    await db.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secret, req.user.id])
+    res.json({ secret, otpauth })
+  } catch (err) {
+    console.error('2fa setup:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── 2FA verify + enable ───────────────────────────────────────────────────────
+router.post('/2fa/verify', requireAuth, async (req, res) => {
+  const { secret, code } = req.body
+  if (!secret || !code) return res.status(400).json({ error: 'Secret and code required' })
+  try {
+    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret })
+    if (!valid) return res.status(400).json({ error: 'Invalid code — try again' })
+    await db.query('UPDATE users SET totp_secret = $1, totp_enabled = TRUE WHERE id = $2', [secret, req.user.id])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('2fa verify:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── 2FA disable ───────────────────────────────────────────────────────────────
+router.post('/2fa/disable', requireAuth, async (req, res) => {
+  const { code } = req.body
+  if (!code) return res.status(400).json({ error: 'Code required' })
+  try {
+    const { rows: [user] } = await db.query('SELECT totp_secret FROM users WHERE id = $1', [req.user.id])
+    if (!user?.totp_secret) return res.status(400).json({ error: '2FA is not set up' })
+    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret: user.totp_secret })
+    if (!valid) return res.status(400).json({ error: 'Invalid code' })
+    await db.query('UPDATE users SET totp_secret = NULL, totp_enabled = FALSE WHERE id = $1', [req.user.id])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('2fa disable:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
 })
 
 module.exports = router

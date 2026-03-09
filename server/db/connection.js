@@ -1,17 +1,17 @@
 'use strict'
-const Database = require('better-sqlite3')
-const path     = require('path')
-const fs       = require('fs')
+const { Pool } = require('pg')
 
-const DB_PATH = process.env.DB_PATH || './data/forgetrack.db'
-const resolved = path.resolve(DB_PATH)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+})
 
-// Ensure directory exists
-const dir = path.dirname(resolved)
-if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+pool.on('error', (err) => {
+  console.error('PostgreSQL pool error:', err.message)
+})
 
-const db = new Database(resolved)
-db.pragma('journal_mode = WAL')
-db.pragma('foreign_keys = ON')
-
-module.exports = db
+// Convenience wrapper — call as: await db.query(sql, [params])
+module.exports = pool

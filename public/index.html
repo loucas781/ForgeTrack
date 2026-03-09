@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/main.css" />
+  <script>!function(){var t=localStorage.getItem("ft-theme")||"system";t!=="system"&&document.documentElement.setAttribute("data-theme",t)}()</script>
 </head>
 <body>
   <div id="app-root"></div>
@@ -52,7 +53,7 @@
           <div class="card stat-card stat-green"><div class="stat-value">${stats.done}</div><div class="stat-label">Done</div></div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
+        <div class="dashboard-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
           <!-- Projects -->
           <section>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -185,6 +186,7 @@
           labels:       document.getElementById('ci-labels').value.split(',').map(l=>l.trim()).filter(Boolean),
         })
         closeModal('create-issue-modal')
+        await uploadPendingAttachments(issue.id)
         location.href = `/issue.html?id=${issue.id}`
       } catch (err) { toast(err.message, 'error') }
     })

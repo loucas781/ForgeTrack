@@ -1,0 +1,45 @@
+name: CI / Deploy
+
+on:
+  push:
+    branches: [main, staging, develop]
+    paths-ignore:
+      - '.version'
+      - 'package.json'
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # ── Lint & basic check ────────────────────────────────────────────
+  test:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --omit=dev --no-audit --no-fund
+
+      - name: Check server starts without error
+        run: node --check server/index.js
+        env:
+          NODE_ENV: staging
+          JWT_SECRET: ci-test-secret
+
+  # ── Deploy to develop LXC (develop branch only) ───────────────────
+  # Requires a self-hosted runner on your Proxmox host.
+  # To set up: GitHub repo → Settings → Actions → Runners → New self-hosted runner
+  # Install the runner on pve01, then uncomment the deploy-develop job below.
+  #
+  # deploy-develop:
+  #   name: Deploy → Develop LXC
+  #   needs: test
+  #   runs-on: self-hosted          # <-- your Proxmox runner
+  #   if: github.ref == 'refs/heads/develop'
+  #   steps:
+  #     - name: Update container
+  #       run: pct exec ${{ vars.DEV_CTID }} -- bash /opt/forgetrack/update.sh

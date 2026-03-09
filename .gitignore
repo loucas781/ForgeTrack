@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Data & logs
+data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+.DS_Store
+
+# Environment files — NEVER commit these, they contain secrets
+.env
+.env.*
+
+# Keep only the example template
+!.env.example

@@ -18,6 +18,12 @@ if (fs.existsSync(envFile)) {
   })
 }
 
+// ─── Version — read from .version file (updated by GitHub Actions) ───────────
+const versionFile = path.join(__dirname, '../.version')
+const APP_VERSION = fs.existsSync(versionFile)
+  ? fs.readFileSync(versionFile, 'utf8').trim()
+  : require('../package.json').version
+
 // ─── Run migration on startup ─────────────────────────────────────────────────
 require('./db/migrate')
 
@@ -34,18 +40,38 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
 
-// Rate limiting on auth endpoints
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false }))
+// Request logger — helps diagnose routing/auth issues
+app.use((req, res, next) => {
+  const hasCookie = !!req.cookies?.token
+  console.log(`[req] ${req.method} ${req.path} cookie=${hasCookie}`)
+  next()
+})
 
-// Serve static files (HTML, CSS, JS, images)
-app.use(express.static(path.join(__dirname, '../public')))
+// Trust proxy only when explicitly configured (i.e. behind Nginx Proxy Manager)
+// Accessing via direct IP without a proxy should not have this set
+if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1)
+
+// Rate limiting on auth endpoints
+// Keyed by real client IP — each user gets their own bucket
+app.use('/api/auth', rateLimit({
+  windowMs:        15 * 60 * 1000,  // 15 minutes
+  max:             20,               // 20 attempts per IP per window
+  standardHeaders: true,
+  legacyHeaders:   false,
+  skip: () => process.env.APP_ENV === 'development',  // disabled in dev LXC
+  message: { error: 'Too many attempts — please wait 15 minutes and try again.' },
+}))
+
+// Serve static assets (CSS, JS, images etc.) but not directory indexes
+// HTML files are handled explicitly below so auth guards run first
+app.use(express.static(path.join(__dirname, '../public'), { index: false }))
 
 // Inject APP_ENV into page responses via a small config endpoint
 app.get('/api/config', optionalAuth, (req, res) => {
   res.json({
     appName: process.env.APP_NAME || 'ForgeTrack',
     appEnv:  process.env.APP_ENV  || env,
-    version: require('../package.json').version,
+    version: APP_VERSION,
     user:    req.user || null,
   })
 })
@@ -57,22 +83,24 @@ app.use('/api/issues',   require('./routes/issues'))
 app.use('/api/users',    require('./routes/users'))
 
 // ── Page routing — serve HTML files, guard protected pages ────────────────────
-// Public pages
+// Public pages — served as-is, client JS handles redirect if already logged in
 app.get('/login.html',  (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')))
 app.get('/signup.html', (req, res) => res.sendFile(path.join(__dirname, '../public/signup.html')))
 
 // Protected pages — redirect to login if no valid token
-app.get(['/', '/index.html'], requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')))
-app.get('/project.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/project.html')))
-app.get('/issue.html',        requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/issue.html')))
-app.get('/profile.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/profile.html')))
-app.get('/settings.html',     requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/settings.html')))
-app.get('/reports.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/reports.html')))
+app.get(['/', '/index.html'],  requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')))
+app.get('/project.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/project.html')))
+app.get('/issue.html',         requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/issue.html')))
+app.get('/profile.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/profile.html')))
+app.get('/settings.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/settings.html')))
+app.get('/reports.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/reports.html')))
 
 // ── 404 handler ────────────────────────────────────────────────────────────────
 app.use((req, res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' })
-  res.redirect('/')
+  // Don't redirect unknown pages to / — that causes redirect loops for
+  // unauthenticated users. Just 404 non-API requests that don't match a route.
+  res.status(404).send('Not found')
 })
 
 // ── Error handler ──────────────────────────────────────────────────────────────

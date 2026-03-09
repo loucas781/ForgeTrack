@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/auth.css" />
+  <script>!function(){var t=localStorage.getItem("ft-theme")||"system";t!=="system"&&document.documentElement.setAttribute("data-theme",t)}()</script>
 </head>
 <body class="auth-page">
   <div class="auth-bg"></div>
@@ -37,7 +38,7 @@
 
       <div class="form-group">
         <label class="form-label" for="email">Email address</label>
-        <input class="form-control" type="email" id="email" name="email" autocomplete="email" placeholder="you@example.com" autofocus />
+        <input class="form-control" type="text" id="email" name="email" autocomplete="email" placeholder="you@example.com" inputmode="email" autofocus />
       </div>
 
       <div class="form-group" style="margin-bottom:8px">
@@ -59,10 +60,10 @@
   </div>
 
   <script>
-    // Redirect if already logged in
+    // Redirect to dashboard only if session is confirmed valid
     fetch('/api/auth/me', { credentials: 'same-origin' })
-      .then(r => { if (r.ok) window.location.href = '/' })
-      .catch(() => {})
+      .then(r => { if (r.status === 200) window.location.href = '/' })
+      .catch(() => { /* no session or network error — stay on page */ })
 
     const form      = document.getElementById('login-form')
     const errorEl   = document.getElementById('form-error')

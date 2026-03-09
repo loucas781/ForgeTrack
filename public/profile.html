@@ -7,6 +7,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/main.css" />
+  <script>!function(){var t=localStorage.getItem("ft-theme")||"system";t!=="system"&&document.documentElement.setAttribute("data-theme",t)}()</script>
+  <style>
+    .profile-avatar-wrap {
+      position:relative; display:inline-block; cursor:pointer;
+    }
+    .profile-avatar-wrap:hover .avatar-overlay { opacity:1; }
+    .avatar-overlay {
+      position:absolute; inset:0; border-radius:50%;
+      background:rgba(0,0,0,.5); display:flex; align-items:center;
+      justify-content:center; opacity:0; transition:opacity 200ms ease;
+    }
+    .avatar-overlay svg { color:#fff; width:20px; height:20px; }
+    #avatar-file-input { display:none; }
+    .profile-card { display:flex; align-items:center; gap:20px; padding:20px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); margin-bottom:20px; }
+    .save-row { display:flex; align-items:center; gap:12px; }
+    .save-ok { color:var(--green); font-size:13px; display:none; }
+    .auth-error { display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff5f5;border:1px solid #ffc3b8;border-radius:var(--r-md);color:var(--red);font-size:13px;margin-bottom:16px;display:none }
+  </style>
 </head>
 <body>
   <div id="app-root"></div>
@@ -16,29 +34,40 @@
   (async () => {
     injectShell()
     await initTopbar()
-    const config = await GET('/config')
-    const me = config.user
     document.title = 'Profile — ForgeTrack'
     const content = document.getElementById('page-content')
+    const config = await GET('/config')
+    const me = config.user
     let selectedColor = me?.color || '#0052cc'
+    let avatarDataUrl = null  // base64 image if user picks one
 
     content.innerHTML = `
-      <div class="page-pad" style="max-width:860px">
+      <div class="page-pad" style="max-width:760px">
         <h1 style="margin-bottom:4px">Your Profile</h1>
-        <p class="text-2" style="margin-bottom:32px">Manage your personal information and account security</p>
+        <p class="text-2" style="margin-bottom:28px">Manage your personal information and account security</p>
 
-        <!-- Profile Info -->
+        <!-- Profile info -->
         <div class="card section-card">
           <h3 class="section-title">Personal Information</h3>
-          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg)">
-            <div id="avatar-preview">${avatarHtml(me, 60)}</div>
+
+          <!-- Live preview -->
+          <div class="profile-card">
+            <div class="profile-avatar-wrap" id="avatar-wrap" title="Click to upload a photo">
+              <div id="avatar-preview">${avatarHtml(me, 64)}</div>
+              <div class="avatar-overlay">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </div>
+              <input type="file" id="avatar-file-input" accept="image/*" />
+            </div>
             <div>
               <div style="font-size:16px;font-weight:600" id="preview-name">${esc(me?.name)}</div>
               <div class="text-3 text-sm">${esc(me?.email)}</div>
               <div class="text-3 text-sm" style="margin-top:2px">Role: <strong style="color:var(--text-2)">${esc(me?.role)}</strong></div>
+              <div class="text-3 text-sm" style="margin-top:6px;font-style:italic" id="avatar-hint">Click the avatar to upload a photo</div>
             </div>
           </div>
-          <div id="profile-error" class="auth-error" style="display:none;margin-bottom:16px"></div>
+
+          <div id="profile-error" class="auth-error"></div>
           <form id="profile-form">
             <div class="form-group">
               <label class="form-label">Full Name</label>
@@ -46,23 +75,23 @@
             </div>
             <div class="form-group">
               <label class="form-label">Email Address</label>
-              <input class="form-control" type="email" id="pf-email" value="${esc(me?.email||'')}" />
+              <input class="form-control" type="text" id="pf-email" value="${esc(me?.email||'')}" inputmode="email" />
             </div>
             <div class="form-group">
-              <label class="form-label">Avatar Colour</label>
+              <label class="form-label">Avatar Colour <span class="text-3" style="font-weight:400">(used when no photo is set)</span></label>
               <div class="color-picker" id="avatar-colors"></div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px">
+            <div class="save-row">
               <button type="submit" class="btn btn-primary">Save Changes</button>
-              <span id="profile-saved" style="color:var(--green);font-size:13px;display:none">✓ Saved!</span>
+              <span class="save-ok" id="profile-saved">✓ Saved!</span>
             </div>
           </form>
         </div>
 
-        <!-- Change Password -->
+        <!-- Change password -->
         <div class="card section-card">
           <h3 class="section-title">Change Password</h3>
-          <div id="pw-error" class="auth-error" style="display:none;margin-bottom:16px"></div>
+          <div id="pw-error" class="auth-error"></div>
           <form id="pw-form">
             <div class="form-group">
               <label class="form-label">Current Password</label>
@@ -76,24 +105,45 @@
               <label class="form-label">Confirm New Password</label>
               <input class="form-control" type="password" id="pf-con-pw" autocomplete="new-password" />
             </div>
-            <div style="display:flex;align-items:center;gap:12px">
+            <div class="save-row">
               <button type="submit" class="btn btn-primary">Update Password</button>
-              <span id="pw-saved" style="color:var(--green);font-size:13px;display:none">✓ Password updated!</span>
+              <span class="save-ok" id="pw-saved">✓ Password updated!</span>
             </div>
           </form>
         </div>
-      </div>
-
-      <style>
-        .auth-error { display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fff5f5;border:1px solid #ffc3b8;border-radius:var(--r-md);color:var(--red);font-size:13px; }
-      </style>`
+      </div>`
 
     // Avatar color picker
     renderColorPicker(document.getElementById('avatar-colors'), AVATAR_COLORS, selectedColor, v => {
       selectedColor = v
-      // Live preview
-      const previewUser = { ...me, color: v, initials: document.getElementById('pf-name').value.trim().split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) || me?.initials }
-      document.getElementById('avatar-preview').innerHTML = avatarHtml(previewUser, 60)
+      if (!avatarDataUrl) {
+        const previewUser = { ...me, color: v, initials: (document.getElementById('pf-name').value.trim().split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)) || me?.initials }
+        document.getElementById('avatar-preview').innerHTML = avatarHtml(previewUser, 64)
+      }
+    })
+
+    // Avatar image upload
+    const avatarWrap = document.getElementById('avatar-wrap')
+    const fileInput  = document.getElementById('avatar-file-input')
+    avatarWrap.addEventListener('click', () => fileInput.click())
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0]
+      if (!file) return
+      if (file.size > 2 * 1024 * 1024) { alert('Image must be under 2MB'); return }
+      const reader = new FileReader()
+      reader.onload = ev => {
+        avatarDataUrl = ev.target.result
+        // Show preview as circular image
+        document.getElementById('avatar-preview').innerHTML =
+          `<img src="${avatarDataUrl}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;display:block" />`
+        document.getElementById('avatar-hint').textContent = 'Photo selected — click Save to apply'
+      }
+      reader.readAsDataURL(file)
+    })
+
+    // Live name preview
+    document.getElementById('pf-name').addEventListener('input', e => {
+      document.getElementById('preview-name').textContent = e.target.value || me?.name
     })
 
     // Profile save
@@ -102,13 +152,21 @@
       const errEl = document.getElementById('profile-error')
       errEl.style.display = 'none'
       try {
-        const res = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ name: document.getElementById('pf-name').value.trim(), email: document.getElementById('pf-email').value.trim(), color: selectedColor }) })
+        const body = {
+          name:  document.getElementById('pf-name').value.trim(),
+          email: document.getElementById('pf-email').value.trim(),
+          color: selectedColor,
+        }
+        if (avatarDataUrl) body.avatar = avatarDataUrl
+        const res  = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify(body) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
-        const saved = document.getElementById('profile-saved')
-        saved.style.display = 'inline'
-        setTimeout(() => saved.style.display = 'none', 2500)
+        const ok = document.getElementById('profile-saved')
+        ok.style.display = 'inline'
+        setTimeout(() => ok.style.display = 'none', 2500)
         document.getElementById('preview-name').textContent = data.user.name
+        avatarDataUrl = null
+        document.getElementById('avatar-hint').textContent = 'Click the avatar to upload a photo'
       } catch (err) { errEl.textContent = err.message; errEl.style.display = 'flex' }
     })
 
@@ -121,15 +179,13 @@
       const conPw = document.getElementById('pf-con-pw').value
       if (newPw !== conPw) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'flex'; return }
       try {
-        const res = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ currentPassword: document.getElementById('pf-cur-pw').value, newPassword: newPw }) })
+        const res  = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ currentPassword: document.getElementById('pf-cur-pw').value, newPassword: newPw }) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
-        document.getElementById('pf-cur-pw').value = ''
-        document.getElementById('pf-new-pw').value = ''
-        document.getElementById('pf-con-pw').value = ''
-        const saved = document.getElementById('pw-saved')
-        saved.style.display = 'inline'
-        setTimeout(() => saved.style.display = 'none', 2500)
+        ;['pf-cur-pw','pf-new-pw','pf-con-pw'].forEach(id => document.getElementById(id).value = '')
+        const ok = document.getElementById('pw-saved')
+        ok.style.display = 'inline'
+        setTimeout(() => ok.style.display = 'none', 2500)
       } catch (err) { errEl.textContent = err.message; errEl.style.display = 'flex' }
     })
   })()

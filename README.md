@@ -65,24 +65,24 @@ Open http://localhost:3000 — you'll be redirected to sign up for the first acc
 
 ## Configuration
 
-Each environment has its own `.env.*` file:
+`.env.*` files are **never committed to git** — they contain secrets. The install script generates the correct file automatically on each server.
 
-| File | Used when |
-|------|-----------|
-| `.env.development` | `NODE_ENV=development` (default for `npm run dev`) |
-| `.env.staging`     | `NODE_ENV=staging` |
-| `.env.production`  | `NODE_ENV=production` |
+For local development, copy the example and fill in your values:
 
-### Key settings
-
-```env
-PORT=3000
-JWT_SECRET=your-long-random-string    # CHANGE THIS in production!
-DB_PATH=./data/forgetrack.db        # Path to SQLite database file
-COOKIE_SECURE=false                   # Set true when using HTTPS
-COOKIE_MAX_AGE_HOURS=72               # Session duration
-APP_ENV=development                   # Controls env badge display
+```bash
+cp .env.example .env.development
+# then edit .env.development with your local DB credentials
 ```
+
+The app loads the env file matching `NODE_ENV`:
+
+| Environment | File loaded | Set by |
+|-------------|-------------|--------|
+| `development` | `.env.development` | Install script / manual |
+| `staging`     | `.env.staging`     | Install script (pass `staging` arg) |
+| `production`  | `.env.production`  | Install script (pass `production` arg) |
+
+See `.env.example` in the repo for all available variables and their descriptions.
 
 ### Generate a secure JWT secret
 ```bash
@@ -208,7 +208,7 @@ All endpoints require authentication via JWT cookie (set automatically on login)
 ## Project Structure
 
 ```
-forgetrack-v2/
+forgetrack/
 ├── server/
 │   ├── index.js               # Express entry point
 │   ├── db/
@@ -236,13 +236,51 @@ forgetrack-v2/
 │   ├── reports.html           # Project reports
 │   ├── profile.html           # User profile
 │   └── settings.html          # App settings
+├── proxmox/                   # Proxmox VE helper scripts
+│   ├── ct/
+│   │   └── forgetrack.sh      # Runs on Proxmox host — creates LXC container
+│   └── install/
+│       └── forgetrack-install.sh  # Runs inside container — installs the app
 ├── data/                      # SQLite database files (git-ignored)
-├── .env.development
-├── .env.staging
-├── .env.production
+├── .env.example          # template — copy and fill in, never commit real values
 ├── .gitignore
 ├── .github/workflows/deploy.yml
 └── package.json
+```
+
+---
+
+## Proxmox VE Deployment
+
+ForgeTrack includes a Proxmox helper script that follows the same pattern as [community-scripts/ProxmoxVE](https://community-scripts.github.io/ProxmoxVE/). It creates a Debian 12 LXC container, installs Node.js 20, clones the `develop` branch, and sets up a systemd service — all in one command.
+
+### One-line install
+
+Run this from your **Proxmox host shell**:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/loucas781/ForgeTrack/staging/proxmox/ct/forgetrack.sh)"
+```
+
+This presents the standard interactive UI for choosing container settings (ID, hostname, IP, storage, password, etc.) before doing anything.
+
+### Default container settings
+
+| Setting | Value      |
+|---------|------------|
+| OS      | Debian 12  |
+| CPU     | 2 cores    |
+| RAM     | 1024 MB    |
+| Disk    | 8 GB       |
+| Port    | 3000       |
+
+### Updating
+
+Re-run the script on an existing container to pull the latest `develop` branch and restart, or run the update helper inside the container directly:
+
+```bash
+# From the Proxmox host
+pct exec <CTID> -- bash /opt/forgetrack/update.sh
 ```
 
 ---
@@ -261,6 +299,39 @@ To enable automatic deployment, configure these secrets in your GitHub repositor
 | `PROD_SSH_KEY` | Private SSH key |
 
 Then uncomment the deploy steps in `.github/workflows/deploy.yml`.
+
+---
+
+## Versioning
+
+ForgeTrack uses automatic semantic versioning driven by GitHub Actions. You never need to manually update the version — it happens on every push.
+
+| Branch    | What happens | Example version |
+|-----------|-------------|-----------------|
+| `develop` | Increments build counter | `0.0.1-dev.4` |
+| `staging` | Bumps patch number, resets counter | `0.0.2` |
+| `main`    | Tags a GitHub Release | `v0.0.2` |
+
+The version is visible in two places in the UI:
+- **Topbar** — small `v0.0.1` chip next to the ForgeTrack logo
+- **Settings → Application Info** — full version string with build type badge
+
+### How the counter works
+
+- `BUILDCOUNT` — a plain text file in the repo root that the Actions workflow increments on every `develop` push
+- `package.json` `version` field — updated automatically by the workflow commit
+- Both files are committed back to the branch by `github-actions[bot]` with a `[skip ci]` tag so they don't trigger another run
+
+### Manual version bump
+
+To bump the minor or major version, update `package.json` manually before merging to `staging`:
+
+```bash
+# e.g. bump minor: 0.0.x → 0.1.0
+npm version minor --no-git-tag-version
+git add package.json BUILDCOUNT
+git commit -m "chore: bump minor version"
+```
 
 ---
 
