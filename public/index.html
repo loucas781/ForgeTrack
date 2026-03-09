@@ -186,6 +186,7 @@
           labels:       document.getElementById('ci-labels').value.split(',').map(l=>l.trim()).filter(Boolean),
         })
         closeModal('create-issue-modal')
+        await uploadPendingAttachments(issue.id)
         location.href = `/issue.html?id=${issue.id}`
       } catch (err) { toast(err.message, 'error') }
     })

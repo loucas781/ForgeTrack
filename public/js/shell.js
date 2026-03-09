@@ -411,6 +411,15 @@ function globalModalsHTML() {
               <label class="form-label">Labels <span class="text-3" style="font-weight:400;text-transform:none;letter-spacing:0">(comma separated)</span></label>
               <input class="form-control" type="text" id="ci-labels" placeholder="frontend, mobile, bug…" />
             </div>
+            <div class="form-group" style="margin-top:16px;margin-bottom:0">
+              <label class="form-label">Attachments <span class="text-3" style="font-weight:400;text-transform:none;letter-spacing:0">(photos or files, max 4MB each)</span></label>
+              <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--text-2);padding:6px 12px;border:1px dashed var(--border-2);border-radius:var(--r-md);transition:border-color var(--t-fast)" id="ci-attach-label">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                Choose files
+                <input type="file" id="ci-attachments" accept="image/*,.pdf,.txt,.csv" multiple style="display:none" />
+              </label>
+              <div id="ci-attach-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="closeModal('create-issue-modal')">Cancel</button>

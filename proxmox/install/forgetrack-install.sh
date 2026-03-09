@@ -126,12 +126,15 @@ msg_ok "ForgeTrack service started"
 cat > /opt/forgetrack/update.sh << 'UPDATEEOF'
 #!/usr/bin/env bash
 set -e; cd /opt/forgetrack
-git pull origin develop
+# Keep .env files safe — git must never overwrite them
+echo ".env.*" >> .git/info/exclude 2>/dev/null || true
+git fetch origin
+git reset --hard origin/develop
 mkdir -p /tmp/npm-cache
 HOME=/root npm install --omit=dev --cache /tmp/npm-cache --unsafe-perm --no-audit --no-fund
 HOME=/root NODE_ENV=development node server/db/migrate.js
 systemctl restart forgetrack
-echo "Done — ForgeTrack running at http://localhost:3000"
+echo "✓ ForgeTrack updated to $(cat .version)"
 UPDATEEOF
 chmod +x /opt/forgetrack/update.sh
 

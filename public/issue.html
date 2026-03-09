@@ -36,8 +36,25 @@
     const issueId = getParam('id')
     if (!issueId) { location.href = '/'; return }
 
-    const issue   = await GET('/issues/' + issueId).catch(() => null)
-    if (!issue) { location.href = '/'; return }
+    let issue
+    try {
+      issue = await GET('/issues/' + issueId)
+    } catch (e) {
+      issue = null
+    }
+    if (!issue) {
+      // Show a proper error rather than silently redirecting
+      injectShell({})
+      await initTopbar()
+      document.getElementById('page-content').innerHTML = `
+        <div class="page-pad" style="max-width:500px;text-align:center;padding-top:80px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="var(--text-3)" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:16px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <h2 style="margin-bottom:8px">Issue not found</h2>
+          <p class="text-2" style="margin-bottom:24px">This issue may have been deleted or you may not have access.</p>
+          <button class="btn btn-primary" onclick="history.back()">Go Back</button>
+        </div>`
+      return
+    }
 
     const project = await GET('/projects/' + issue.project_id).catch(() => null)
     const users   = await GET('/users')
@@ -203,7 +220,7 @@
         </div>`
     }
 
-    function wireEvents(iss) {
+    async function wireEvents(iss) {
       // Sidebar field saves
       async function saveField(field, value) {
         try { await PATCH('/issues/' + issueId, { [field]: value }); toast('Saved', 'success') }
