@@ -37,6 +37,7 @@ async function migrate() {
         password    TEXT NOT NULL,
         initials    TEXT NOT NULL,
         color       TEXT NOT NULL DEFAULT '#0052cc',
+        avatar      TEXT,
         role        TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','member')),
         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
@@ -102,6 +103,9 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_issues_status   ON issues(status);
       CREATE INDEX IF NOT EXISTS idx_comments_issue  ON comments(issue_id);
       CREATE INDEX IF NOT EXISTS idx_labels_issue    ON issue_labels(issue_id);
+
+      -- ── Migrations for existing installs ─────────────────────────────
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;
 
     `)
     console.log('✓ PostgreSQL schema ready')

@@ -43,6 +43,9 @@ function toast(msg, type = '') {
 function avatarHtml(user, size = 24) {
   if (!user) return ''
   const fs = Math.max(9, Math.round(size * 0.38))
+  if (user.avatar) {
+    return `<img src="${esc(user.avatar)}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;flex-shrink:0" title="${esc(user.name)}" />`
+  }
   return `<span class="avatar" style="width:${size}px;height:${size}px;background:${user.color||'#0052cc'};font-size:${fs}px" title="${esc(user.name)}">${esc(user.initials||'?')}</span>`
 }
 

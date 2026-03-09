@@ -16,53 +16,71 @@ body.auth-page { display: flex; align-items: center; justify-content: center; mi
 .auth-switch { text-align: center; font-size: 13px; color: var(--text-2); margin-top: 16px; }
 .auth-switch a { font-weight: 500; }
 
-/* ── Auth page theme support ─────────────────────────────────── */
-html.theme-transitioning .auth-page,
-html.theme-transitioning .auth-card,
-html.theme-transitioning .auth-bg,
-html.theme-transitioning .form-control {
-  transition: background-color 350ms ease, background 350ms ease,
-              color 350ms ease, border-color 350ms ease !important;
+
+/* ── Auth page dark mode — explicit data-theme ───────────────── */
+[data-theme="dark"] body.auth-page,
+[data-theme="oled"] body.auth-page {
+  background: var(--bg);
 }
-
-[data-theme="dark"] .auth-page,
-[data-theme="oled"] .auth-page { background: var(--bg); }
-
+[data-theme="dark"] .auth-bg,
+[data-theme="oled"] .auth-bg { opacity: .03; }
 [data-theme="dark"] .auth-card,
-[data-theme="oled"] .auth-card { background: var(--surface); border-color: var(--border); }
-
+[data-theme="oled"] .auth-card {
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgba(0,0,0,.6);
+}
+[data-theme="dark"] .auth-logo,
+[data-theme="oled"] .auth-logo { border-color: var(--border-2); }
+[data-theme="dark"] .auth-logo-text,
+[data-theme="oled"] .auth-logo-text { color: var(--text); }
+[data-theme="dark"] .auth-tabs,
+[data-theme="oled"] .auth-tabs { background: var(--gray-200); border-color: var(--border-2); }
+[data-theme="dark"] .auth-tab,
+[data-theme="oled"] .auth-tab { color: var(--text-2); }
+[data-theme="dark"] .auth-tab.active,
+[data-theme="oled"] .auth-tab.active { color: var(--text); }
 [data-theme="dark"] .auth-heading,
 [data-theme="oled"] .auth-heading { color: var(--text); }
-
 [data-theme="dark"] .auth-subheading,
 [data-theme="oled"] .auth-subheading { color: var(--text-2); }
-
 [data-theme="dark"] .form-label,
 [data-theme="oled"] .form-label { color: var(--text-2); }
-
 [data-theme="dark"] .form-control,
 [data-theme="oled"] .form-control {
-  background: var(--gray-200); border-color: var(--border);
-  color: var(--text);
+  background: var(--gray-200); border-color: var(--border); color: var(--text);
 }
 [data-theme="dark"] .form-control::placeholder,
 [data-theme="oled"] .form-control::placeholder { color: var(--text-3); }
 [data-theme="dark"] .form-control:focus,
-[data-theme="oled"] .form-control:focus {
-  background: var(--gray-300); border-color: var(--brand);
-}
-
+[data-theme="oled"] .form-control:focus { background: var(--gray-300); border-color: var(--brand); }
 [data-theme="dark"] .auth-switch,
 [data-theme="oled"] .auth-switch { color: var(--text-2); }
 
+/* ── Auth page dark mode — OS system preference ──────────────── */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .auth-page  { background: var(--bg); }
-  :root:not([data-theme="light"]) .auth-card  { background: var(--surface); border-color: var(--border); }
-  :root:not([data-theme="light"]) .auth-heading { color: var(--text); }
+  :root:not([data-theme="light"]) body.auth-page  { background: var(--bg); }
+  :root:not([data-theme="light"]) .auth-bg        { opacity: .03; }
+  :root:not([data-theme="light"]) .auth-card      { background: var(--surface); box-shadow: 0 24px 80px rgba(0,0,0,.6); }
+  :root:not([data-theme="light"]) .auth-logo      { border-color: var(--border-2); }
+  :root:not([data-theme="light"]) .auth-logo-text { color: var(--text); }
+  :root:not([data-theme="light"]) .auth-tabs      { background: var(--gray-200); border-color: var(--border-2); }
+  :root:not([data-theme="light"]) .auth-tab       { color: var(--text-2); }
+  :root:not([data-theme="light"]) .auth-tab.active { color: var(--text); }
+  :root:not([data-theme="light"]) .auth-heading   { color: var(--text); }
   :root:not([data-theme="light"]) .auth-subheading { color: var(--text-2); }
-  :root:not([data-theme="light"]) .form-label { color: var(--text-2); }
-  :root:not([data-theme="light"]) .form-control {
-    background: var(--gray-200); border-color: var(--border); color: var(--text);
-  }
+  :root:not([data-theme="light"]) .form-label     { color: var(--text-2); }
+  :root:not([data-theme="light"]) .form-control   { background: var(--gray-200); border-color: var(--border); color: var(--text); }
   :root:not([data-theme="light"]) .form-control::placeholder { color: var(--text-3); }
+  :root:not([data-theme="light"]) .form-control:focus { background: var(--gray-300); border-color: var(--brand); }
+  :root:not([data-theme="light"]) .auth-switch    { color: var(--text-2); }
+}
+
+/* ── Smooth transition on theme change ───────────────────────── */
+html.theme-transitioning body.auth-page,
+html.theme-transitioning .auth-card,
+html.theme-transitioning .auth-tabs,
+html.theme-transitioning .form-control {
+  transition: background-color 350ms ease, background 350ms ease,
+              color 350ms ease, border-color 350ms ease,
+              box-shadow 350ms ease !important;
 }

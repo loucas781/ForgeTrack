@@ -8,6 +8,38 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/main.css" />
   <script>!function(){var t=localStorage.getItem("ft-theme")||"system";t!=="system"&&document.documentElement.setAttribute("data-theme",t)}()</script>
+  <style>
+    .settings-layout{display:flex;min-height:calc(100vh - var(--topbar-h))}
+    .settings-nav{width:220px;flex-shrink:0;border-right:1px solid var(--border-2);padding:24px 0;background:var(--surface)}
+    .settings-nav-label{padding:4px 20px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
+    .settings-nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 20px;background:none;border:none;border-left:3px solid transparent;font-family:var(--font);font-size:13px;color:var(--text-2);cursor:pointer;text-align:left;transition:background var(--t-fast),color var(--t-fast)}
+    .settings-nav-item:hover{background:var(--gray-100);color:var(--text)}
+    .settings-nav-item.active{background:var(--brand-light);color:var(--brand);border-left-color:var(--brand);font-weight:500}
+    .settings-nav-item svg{width:15px;height:15px;flex-shrink:0}
+    .settings-content{flex:1;overflow-y:auto}
+    .settings-panel{display:none;padding:32px;max-width:760px}
+    .settings-panel.active{display:block}
+    .settings-panel h2{font-size:20px;font-weight:700;margin-bottom:4px}
+    .panel-sub{color:var(--text-2);font-size:13px;margin-bottom:28px}
+    .section-card{margin-bottom:20px}
+    .info-table{width:100%;border-collapse:collapse;font-size:13px}
+    .info-table td{padding:10px 14px;border-bottom:1px solid var(--border-2)}
+    .info-table td:first-child{color:var(--text-2);width:180px}
+    .info-table tr:last-child td{border-bottom:none}
+    .member-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-2)}
+    .member-row:last-child{border-bottom:none}
+    .theme-options{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
+    .theme-option{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 20px;border:2px solid var(--border-2);border-radius:var(--r-lg);background:var(--gray-50);cursor:pointer;transition:border-color var(--t-fast),background var(--t-fast);min-width:90px}
+    .theme-option:hover{border-color:var(--brand)}
+    .theme-option.active{border-color:var(--brand);background:var(--brand-light)}
+    .theme-option span{font-size:12px;font-weight:500;color:var(--text-2)}
+    .theme-option.active span{color:var(--brand)}
+    .theme-swatch{width:44px;height:30px;border-radius:6px;border:1px solid var(--border)}
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+    .stat-card{background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);padding:16px}
+    .stat-card .stat-val{font-size:28px;font-weight:700;color:var(--text);font-family:var(--mono)}
+    .stat-card .stat-lbl{font-size:12px;color:var(--text-3);margin-top:2px}
+  </style>
 </head>
 <body>
   <div id="app-root"></div>
@@ -19,101 +51,165 @@
     await initTopbar()
     document.title = 'Settings — ForgeTrack'
     const content = document.getElementById('page-content')
-    const [config, users, projects] = await Promise.all([GET('/config'), GET('/users'), GET('/projects')])
+    const [config, users, projects, issues] = await Promise.all([GET('/config'), GET('/users'), GET('/projects'), GET('/issues')])
     const me = config.user
+    const v = config.version || '0.0.1'
+    const isDev  = v.includes('-dev.')
+    const isRC   = v.includes('-rc')
+    const base   = v.split('-')[0]
+    const devNum = isDev ? v.split('-dev.')[1] : null
+    const tag    = isDev ? `v${base}-dev.${devNum}` : isRC ? `v${base}-rc` : `v${base}`
+    const vColor = isDev ? 'var(--orange)' : isRC ? 'var(--brand)' : 'var(--green)'
+    const vLabel = isDev ? `dev build #${devNum}` : isRC ? 'release candidate' : 'stable release'
 
     content.innerHTML = `
-      <div class="page-pad" style="max-width:860px">
-        <h1 style="margin-bottom:4px">Settings</h1>
-        <p class="text-2" style="margin-bottom:32px">Application configuration and team overview</p>
+      <div class="settings-layout">
+        <nav class="settings-nav">
+          <div class="settings-nav-label">Settings</div>
+          <button class="settings-nav-item active" data-panel="appearance">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            Appearance
+          </button>
+          <button class="settings-nav-item" data-panel="team">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            Team
+          </button>
+          <button class="settings-nav-item" data-panel="build">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Build Info
+          </button>
+        </nav>
+        <div class="settings-content">
 
-        <!-- Your account -->
-        <div class="card section-card">
-          <h3 class="section-title">Your Account</h3>
-          <div style="display:flex;align-items:center;gap:16px">
-            ${avatarHtml(me, 48)}
-            <div style="flex:1">
-              <div style="font-weight:600;font-size:15px">${esc(me?.name)}</div>
-              <div class="text-2 text-sm">${esc(me?.email)}</div>
-              <div class="text-3 text-sm" style="margin-top:2px">Role: <strong style="color:var(--text-2)">${esc(me?.role)}</strong></div>
-            </div>
-            <a href="/profile.html" class="btn btn-secondary">
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              Edit Profile
-            </a>
-          </div>
-        </div>
-
-        <!-- Team members -->
-        <div class="card section-card">
-          <h3 class="section-title">Team Members (${users.length})</h3>
-          <p class="text-2 text-sm" style="margin-bottom:16px">
-            Everyone who has created an account on this instance.
-            New members can sign up at <code style="font-size:11px;background:var(--gray-100);padding:1px 5px;border-radius:3px">/signup.html</code>.
-          </p>
-          ${users.map(u => `
-            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-2)">
-              ${avatarHtml(u, 36)}
-              <div style="flex:1">
-                <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px">
-                  ${esc(u.name)}
-                  ${u.id === me?.id ? `<span class="role-badge" style="background:var(--brand-light);color:var(--brand)">you</span>` : ''}
-                </div>
-                <div class="text-3 text-sm">${esc(u.email)}</div>
+          <!-- Appearance -->
+          <div class="settings-panel active" id="panel-appearance">
+            <h2>Appearance</h2>
+            <p class="panel-sub">Customise how ForgeTrack looks. Saved to this browser only.</p>
+            <div class="card section-card">
+              <h3 class="section-title">Colour scheme</h3>
+              <p class="text-2 text-sm" style="margin-bottom:16px">Choose a theme or follow your system preference.</p>
+              <div class="theme-options">
+                <button class="theme-option" data-theme-choice="system">
+                  <span class="theme-swatch" style="background:linear-gradient(135deg,#f4f5f7 50%,#1e2535 50%)"></span>
+                  <span>System</span>
+                </button>
+                <button class="theme-option" data-theme-choice="light">
+                  <span class="theme-swatch" style="background:#f4f5f7"></span>
+                  <span>Light</span>
+                </button>
+                <button class="theme-option" data-theme-choice="dark">
+                  <span class="theme-swatch" style="background:#1e2535"></span>
+                  <span>Dark</span>
+                </button>
+                <button class="theme-option" data-theme-choice="oled">
+                  <span class="theme-swatch" style="background:#000"></span>
+                  <span>OLED Black</span>
+                </button>
               </div>
-              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:var(--gray-100);color:var(--text-2)">${esc(u.role)}</span>
-            </div>`).join('')}
-        </div>
+            </div>
+          </div>
 
-        <!-- App info -->
-        <div class="card section-card">
-          <h3 class="section-title">Application Info</h3>
-          <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <tbody>
-              ${(() => {
-                const v       = config.version || '0.0.1'
-                const isDev   = v.includes('-dev.')
-                const isRC    = v.includes('-rc')
-                const base    = v.split('-')[0]
-                const devNum  = isDev ? v.split('-dev.')[1] : null
-                const tag     = isDev ? `v${base}-dev.${devNum}` : isRC ? `v${base}-rc` : `v${base}`
-                const ghTagUrl = `https://github.com/loucas781/ForgeTrack/releases/tag/${tag}`
-                const typeColor = isDev ? 'var(--orange)' : isRC ? 'var(--brand)' : 'var(--green)'
-                const typeLabel = isDev ? `dev build #${devNum}` : isRC ? 'release candidate' : 'release'
-                const tdA = `padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2);width:160px;vertical-align:top`
-                const tdB = `padding:8px 12px;border-bottom:1px solid var(--border-2)`
-                return `
-                  <tr>
-                    <td style="${tdA}">Version</td>
-                    <td style="${tdB}">
-                      <div style="display:flex;align-items:center;gap:10px">
-                        <span class="mono" style="font-size:16px;font-weight:700;color:var(--text)">v${base}</span>
-                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:10px;background:${typeColor}18;color:${typeColor};border:1px solid ${typeColor}40">${typeLabel}</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="${tdA}">Build string</td>
-                    <td style="${tdB}">
-                      <span class="mono" style="font-size:12px;color:var(--text-2)">${esc(v)}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="${tdA}">Git tag</td>
-                    <td style="${tdB}">
-                      <a href="${ghTagUrl}" target="_blank" rel="noopener"
-                         class="mono" style="font-size:12px;color:var(--brand)">${esc(tag)}</a>
-                    </td>
-                  </tr>`
-              })()}
-              <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Environment</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)"><span class="env-chip ${esc(config.appEnv)}">${esc(config.appEnv)}</span></td></tr>
-              <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Projects</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)">${projects.length}</td></tr>
-              <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border-2);color:var(--text-2)">Team Members</td><td style="padding:8px 12px;border-bottom:1px solid var(--border-2)">${users.length}</td></tr>
-              <tr><td style="padding:8px 12px;color:var(--text-2)">Database</td><td style="padding:8px 12px">SQLite</td></tr>
-            </tbody>
-          </table>
+          <!-- Team -->
+          <div class="settings-panel" id="panel-team">
+            <h2>Team</h2>
+            <p class="panel-sub">Everyone with an account on this instance.</p>
+            <div class="card section-card">
+              <h3 class="section-title">Members (${users.length})</h3>
+              <p class="text-2 text-sm" style="margin-bottom:16px">New members can sign up at <code style="font-size:11px;background:var(--gray-100);padding:1px 6px;border-radius:3px">/signup.html</code></p>
+              ${users.map(u => `
+                <div class="member-row">
+                  ${avatarHtml(u, 36)}
+                  <div style="flex:1">
+                    <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px">
+                      ${esc(u.name)}
+                      ${u.id === me?.id ? `<span class="role-badge">you</span>` : ''}
+                    </div>
+                    <div class="text-3 text-sm">${esc(u.email)}</div>
+                  </div>
+                  <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:var(--gray-100);color:var(--text-2)">${esc(u.role)}</span>
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <!-- Build Info -->
+          <div class="settings-panel" id="panel-build">
+            <h2>Build Info</h2>
+            <p class="panel-sub">Version, environment and instance statistics.</p>
+            <div class="card section-card">
+              <h3 class="section-title">Version</h3>
+              <div style="display:flex;align-items:center;gap:20px;padding:16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);margin-bottom:16px">
+                <div>
+                  <div style="font-size:32px;font-weight:700;font-family:var(--mono);color:var(--text);line-height:1">v${base}</div>
+                  <div style="margin-top:6px">
+                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 10px;border-radius:10px;background:${vColor}18;color:${vColor};border:1px solid ${vColor}40">${vLabel}</span>
+                  </div>
+                </div>
+                <div style="flex:1"></div>
+                <div style="text-align:right;font-size:12px">
+                  <div class="text-3">Build string</div>
+                  <div class="mono" style="color:var(--text-2);margin-top:2px">${esc(v)}</div>
+                  <div class="text-3" style="margin-top:8px">Git tag</div>
+                  <a href="https://github.com/loucas781/ForgeTrack/releases/tag/${tag}" target="_blank" rel="noopener" class="mono" style="color:var(--brand)">${esc(tag)}</a>
+                </div>
+              </div>
+              <table class="info-table">
+                <tr><td>Environment</td><td><span class="env-chip ${esc(config.appEnv)}">${esc(config.appEnv)}</span></td></tr>
+                <tr><td>App name</td><td>${esc(config.appName)}</td></tr>
+              </table>
+            </div>
+            <div class="card section-card">
+              <h3 class="section-title">Instance Statistics</h3>
+              <div class="stat-grid">
+                <div class="stat-card"><div class="stat-val">${projects.length}</div><div class="stat-lbl">Projects</div></div>
+                <div class="stat-card"><div class="stat-val">${issues.length}</div><div class="stat-lbl">Total Issues</div></div>
+                <div class="stat-card"><div class="stat-val">${issues.filter(i=>i.status!=='done'&&i.status!=='cancelled').length}</div><div class="stat-lbl">Open Issues</div></div>
+                <div class="stat-card"><div class="stat-val">${issues.filter(i=>i.status==='inprogress').length}</div><div class="stat-lbl">In Progress</div></div>
+                <div class="stat-card"><div class="stat-val">${issues.filter(i=>i.type==='bug').length}</div><div class="stat-lbl">Bugs</div></div>
+                <div class="stat-card"><div class="stat-val">${users.length}</div><div class="stat-lbl">Team Members</div></div>
+              </div>
+              <table class="info-table">
+                <tr><td>Database</td><td>PostgreSQL</td></tr>
+                <tr><td>Runtime</td><td>Node.js</td></tr>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>`
+
+    // Tab switching
+    document.querySelectorAll('.settings-nav-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.settings-nav-item').forEach(b => b.classList.remove('active'))
+        document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'))
+        btn.classList.add('active')
+        document.getElementById('panel-' + btn.dataset.panel).classList.add('active')
+        history.replaceState(null, '', '#' + btn.dataset.panel)
+      })
+    })
+
+    // Theme picker
+    function updateThemeUI(choice) {
+      document.querySelectorAll('.theme-option').forEach(o => o.classList.toggle('active', o.dataset.themeChoice === choice))
+    }
+    updateThemeUI(localStorage.getItem('ft-theme') || 'system')
+    document.querySelectorAll('.theme-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const choice = opt.dataset.themeChoice
+        localStorage.setItem('ft-theme', choice)
+        const html = document.documentElement
+        html.classList.add('theme-transitioning')
+        setTimeout(() => html.classList.remove('theme-transitioning'), 400)
+        choice === 'system' ? html.removeAttribute('data-theme') : html.setAttribute('data-theme', choice)
+        updateThemeUI(choice)
+        // Sync topbar icon
+        document.querySelectorAll('.theme-picker-item').forEach(i => i.classList.toggle('active', i.dataset.themeChoice === choice))
+      })
+    })
+
+    // Hash routing
+    const hash = location.hash.replace('#','')
+    if (hash && document.getElementById('panel-' + hash)) document.querySelector(`[data-panel="${hash}"]`)?.click()
   })()
   </script>
 </body>

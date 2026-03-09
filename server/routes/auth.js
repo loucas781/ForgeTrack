@@ -58,7 +58,7 @@ router.post('/signup', async (req, res) => {
       [id, name.trim(), norm, hash, getInitials(name), COLORS[colorIdx], count === 0 ? 'admin' : 'member']
     )
     const { rows: [user] } = await db.query(
-      'SELECT id, name, email, initials, color, role FROM users WHERE id = $1', [id]
+      'SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = $1', [id]
     )
     res.cookie('token', makeToken(user), cookieOpts())
     res.json({ ok: true, user })
@@ -101,7 +101,7 @@ router.post('/logout', (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT id, name, email, initials, color, role, created_at FROM users WHERE id = $1', [req.user.id]
+      'SELECT id, name, email, initials, color, avatar, role, created_at FROM users WHERE id = $1', [req.user.id]
     )
     if (!rows.length) return res.status(404).json({ error: 'User not found' })
     res.json(rows[0])
@@ -121,6 +121,7 @@ router.patch('/profile', requireAuth, async (req, res) => {
     const updates = {}
     if (name?.trim())  { updates.name = name.trim(); updates.initials = getInitials(name.trim()) }
     if (color)         { updates.color = color }
+    if (req.body.avatar !== undefined) { updates.avatar = req.body.avatar || null }
     if (email?.trim()) {
       const normalized = email.trim().toLowerCase()
       if (normalized !== user.email) {
@@ -148,7 +149,7 @@ router.patch('/profile', requireAuth, async (req, res) => {
     }
 
     const { rows: [updated] } = await db.query(
-      'SELECT id, name, email, initials, color, role FROM users WHERE id = $1', [user.id]
+      'SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = $1', [user.id]
     )
     res.cookie('token', makeToken(updated), cookieOpts())
     res.json({ ok: true, user: updated })
