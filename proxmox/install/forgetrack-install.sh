@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # ForgeTrack — LXC Install Script
-# Runs inside the container via: pct exec $CTID -- bash -c "$(curl ...)"
 
 set -euo pipefail
 
-# Suppress locale noise
 export LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive
 
 GN=$(echo "\033[1;92m"); RD=$(echo "\033[01;31m"); YW=$(echo "\033[33m"); CL=$(echo "\033[m")
@@ -17,7 +15,7 @@ msg_info "Updating OS packages"
 apt-get update -qq && apt-get upgrade -y -qq 2>&1 | tail -3
 msg_ok "OS packages updated"
 
-# ── 2. Base deps (curl already present, but ensure git + gnupg) ───────────────
+# ── 2. Base deps ──────────────────────────────────────────────────────────────
 msg_info "Installing base dependencies"
 apt-get install -y -qq curl git gnupg ca-certificates openssl
 msg_ok "Base dependencies ready"
@@ -36,17 +34,16 @@ msg_ok "Node.js $(node --version) installed"
 msg_info "Installing PostgreSQL"
 apt-get install -y -qq postgresql postgresql-client 2>&1 | tail -3
 systemctl enable postgresql --now
-# Wait up to 15s for postgres to accept connections
 for i in $(seq 1 15); do
   pg_isready -q && break || sleep 1
   [[ $i -eq 15 ]] && msg_error "PostgreSQL did not start in time"
 done
-msg_ok "PostgreSQL $(pg_isready --version | awk '{print $3}') running"
+msg_ok "PostgreSQL running"
 
-# ── 5. Create DB user and database (running as root — use su, not sudo) ───────
+# ── 5. Create DB and user ─────────────────────────────────────────────────────
 msg_info "Creating database"
 DB_PASS=$(openssl rand -hex 24)
-su -s /bin/sh postgres -c "psql -q" << SQL
+su -s /bin/sh -c "psql -q" postgres 2>/dev/null << SQL
 CREATE USER forgetrack WITH PASSWORD '${DB_PASS}';
 CREATE DATABASE forgetrack OWNER forgetrack;
 SQL
@@ -54,14 +51,17 @@ msg_ok "Database 'forgetrack' created"
 
 # ── 6. Clone repo ─────────────────────────────────────────────────────────────
 msg_info "Cloning ForgeTrack"
+rm -rf /opt/forgetrack
 git clone --branch develop --single-branch --quiet \
   https://github.com/loucas781/ForgeTrack.git /opt/forgetrack 2>/dev/null
-msg_ok "ForgeTrack cloned to /opt/forgetrack"
+msg_ok "ForgeTrack cloned"
 
 # ── 7. npm install ────────────────────────────────────────────────────────────
+# Set HOME + npm cache explicitly — fixes uid-remap permission issues in
+# unprivileged LXC containers without needing a separate system user
 msg_info "Installing Node.js dependencies"
 cd /opt/forgetrack
-npm ci --omit=dev --cache /tmp/npm-cache --silent
+HOME=/root npm ci --omit=dev --cache /tmp/npm-cache --silent
 msg_ok "Node.js dependencies installed"
 
 # ── 8. Write .env ─────────────────────────────────────────────────────────────
@@ -79,9 +79,9 @@ COOKIE_MAX_AGE_HOURS=72
 ENVEOF
 msg_ok "Configuration written"
 
-# ── 9. Run DB migration ───────────────────────────────────────────────────────
+# ── 9. DB migration ───────────────────────────────────────────────────────────
 msg_info "Running database migration"
-cd /opt/forgetrack && NODE_ENV=development node server/db/migrate.js
+cd /opt/forgetrack && HOME=/root NODE_ENV=development node server/db/migrate.js
 msg_ok "Database schema ready"
 
 # ── 10. systemd service ───────────────────────────────────────────────────────
@@ -114,10 +114,10 @@ cat > /opt/forgetrack/update.sh << 'UPDATEEOF'
 #!/usr/bin/env bash
 set -e; cd /opt/forgetrack
 git pull origin develop
-npm ci --omit=dev --cache /tmp/npm-cache --silent
-NODE_ENV=development node server/db/migrate.js
+HOME=/root npm ci --omit=dev --cache /tmp/npm-cache --silent
+HOME=/root NODE_ENV=development node server/db/migrate.js
 systemctl restart forgetrack
-echo "Updated — running at http://localhost:3000"
+echo "Done — ForgeTrack running at http://localhost:3000"
 UPDATEEOF
 chmod +x /opt/forgetrack/update.sh
 

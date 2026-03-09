@@ -22,9 +22,9 @@ CTID_CREATED=""   # set after pct create succeeds so we only clean up if created
 cleanup_on_error() {
   if [[ -n "$CTID_CREATED" ]]; then
     echo ""
-    echo -e " ${CROSS}${RD}Installation failed — destroying container ${CTID_CREATED} in 5s...${CL}"
-    echo -e " ${TAB}${TAB}${YW}(Press Ctrl-C within 5s to keep the container for debugging)${CL}"
-    sleep 5
+    echo -e " ${CROSS}${RD}Installation failed — destroying container ${CTID_CREATED} in 60s...${CL}"
+    echo -e " ${TAB}${TAB}${YW}(Press Ctrl-C within 60s to keep the container for debugging)${CL}"
+    sleep 60
     pct stop "$CTID_CREATED" &>/dev/null || true
     pct destroy "$CTID_CREATED" --purge &>/dev/null || true
     echo -e " ${CM}${GN}Container ${CTID_CREATED} destroyed.${CL}"
