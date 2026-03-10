@@ -17,6 +17,7 @@ if [[ "$APP_ENV" != "development" && "$APP_ENV" != "staging" && "$APP_ENV" != "p
 fi
 COOKIE_SECURE="false"
 [[ "$APP_ENV" == "production" || "$APP_ENV" == "staging" ]] && COOKIE_SECURE="true"
+# It must stay false while running over plain HTTP or logins will silently fail
 msg_ok "Deploying environment: ${APP_ENV}"
 
 # ── 1. OS update ──────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ NODE_ENV=${APP_ENV}
 PORT=3000
 APP_NAME=ForgeTrack
 APP_ENV=${APP_ENV}
+APP_URL=http://$(hostname -I | awk '{print $1}'):3000
 JWT_SECRET=${JWT_SECRET}
 DATABASE_URL=postgresql://forgetrack:${DB_PASS}@localhost:5432/forgetrack
 COOKIE_SECURE=${COOKIE_SECURE}

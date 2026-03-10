@@ -161,10 +161,17 @@
         const res  = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify(body) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
+        // Update local me reference so colour picker re-renders correctly
+        Object.assign(me, data.user)
         const ok = document.getElementById('profile-saved')
         ok.style.display = 'inline'
         setTimeout(() => ok.style.display = 'none', 2500)
         document.getElementById('preview-name').textContent = data.user.name
+        // Re-render avatar preview using the saved data (not the temp data URL)
+        document.getElementById('avatar-preview').innerHTML = avatarHtml(data.user, 64)
+        // Refresh the topbar avatar chip so it reflects the new photo/colour immediately
+        const topbarAvatar = document.querySelector('.topbar-avatar-btn')
+        if (topbarAvatar) topbarAvatar.innerHTML = avatarHtml(data.user, 28)
         avatarDataUrl = null
         document.getElementById('avatar-hint').textContent = 'Click the avatar to upload a photo'
       } catch (err) { errEl.textContent = err.message; errEl.style.display = 'flex' }

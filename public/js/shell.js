@@ -192,7 +192,7 @@ function buildDashboardBottomNav() {
         Search
       </button>
       <a href="/settings.html" class="bottom-nav-btn${path==='/settings.html'?' active':''}">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         Settings
       </a>
       <a href="/profile.html" class="bottom-nav-btn${path==='/profile.html'?' active':''}">
@@ -243,7 +243,7 @@ function injectShell(opts = {}) {
     <div id="env-corner" class="env-corner"></div>
     ${globalModalsHTML()}
     <!-- Mobile full-screen search -->
-    <div id="mobile-search-overlay" style="display:none;position:fixed;inset:0;background:var(--gray-950);z-index:300;padding:12px;flex-direction:column;gap:8px">
+    <div id="mobile-search-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:300;padding:12px;flex-direction:column;gap:8px">
       <div style="display:flex;gap:8px;align-items:center">
         <div style="position:relative;flex:1">
           <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.4);pointer-events:none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -329,16 +329,44 @@ function initMobileInteractions() {
     if (!q) { mobileSearchResults.style.display = 'none'; return }
     mobileDebounce = setTimeout(async () => {
       try {
-        const issues = await GET(`/issues?q=${encodeURIComponent(q)}`)
-        if (!issues.length) { mobileSearchResults.style.display = 'none'; return }
-        mobileSearchResults.innerHTML = issues.slice(0,8).map(i => `
-          <button class="search-result-item" onclick="location.href='/issue.html?id=${i.id}'">
-            ${typeIcon(i.type)}
-            <span class="search-result-key">${esc(i.key)}</span>
-            <span class="search-result-title">${esc(i.title)}</span>
-          </button>`).join('')
+        const [issues, projects] = await Promise.all([
+          GET(`/issues?q=${encodeURIComponent(q)}`),
+          GET('/projects'),
+        ])
+        const matchedProjects = projects.filter(p =>
+          p.name.toLowerCase().includes(q.toLowerCase()) ||
+          p.key.toLowerCase().includes(q.toLowerCase())
+        ).slice(0, 3)
+        const matchedIssues = issues.slice(0, 6)
+
+        if (!matchedProjects.length && !matchedIssues.length) {
+          mobileSearchResults.innerHTML = `<div style="padding:14px 16px;font-size:13px;color:var(--text-3)">No results for "${esc(q)}"</div>`
+          mobileSearchResults.style.display = 'block'
+          return
+        }
+
+        let html = ''
+        if (matchedProjects.length) {
+          html += `<div style="padding:8px 12px 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">Projects</div>`
+          html += matchedProjects.map(p => `
+            <button class="search-result-item" onclick="location.href='/project.html?id=${p.id}'">
+              ${projectIcon(p, 18)}
+              <span class="search-result-title" style="font-weight:500">${esc(p.name)}</span>
+              <span class="search-result-project">${esc(p.key)}</span>
+            </button>`).join('')
+        }
+        if (matchedIssues.length) {
+          html += `<div style="padding:8px 12px 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)${matchedProjects.length ? ';border-top:1px solid var(--border-2);margin-top:4px;padding-top:8px' : ''}">Issues</div>`
+          html += matchedIssues.map(i => `
+            <button class="search-result-item" onclick="location.href='/issue.html?id=${i.id}'">
+              ${typeIcon(i.type)}
+              <span class="search-result-key">${esc(i.key)}</span>
+              <span class="search-result-title">${esc(i.title)}</span>
+            </button>`).join('')
+        }
+        mobileSearchResults.innerHTML = html
         mobileSearchResults.style.display = 'block'
-      } catch {}
+      } catch { mobileSearchResults.style.display = 'none' }
     }, 250)
   })
 }

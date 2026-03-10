@@ -120,6 +120,34 @@ async function migrate() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS icon TEXT;
+
+      -- ── Password reset tokens ─────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token      TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used       BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token);
+
+      -- ── Audit log ──────────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id          TEXT PRIMARY KEY,
+        actor_id    TEXT REFERENCES users(id) ON DELETE SET NULL,
+        action      TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id   TEXT,
+        entity_name TEXT,
+        meta        TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_actor    ON audit_log(actor_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_created  ON audit_log(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_entity   ON audit_log(entity_type, entity_id);
 
     `)
     console.log('✓ PostgreSQL schema ready')

@@ -1,21 +1,32 @@
 name: Version
 
 # ── REQUIRED SETUP ────────────────────────────────────────────────────────────
-# This workflow commits .version back to the repo on every push.
-# For it to work you MUST enable write permissions in your repo:
-#
-#   GitHub repo → Settings → Actions → General
-#   → Workflow permissions → Read and write permissions → Save
-#
-# Once enabled, every push to develop will produce versions like 0.0.1-dev.1
+# GitHub repo → Settings → Actions → General
+# → Workflow permissions → Read and write permissions → Save
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
   push:
-    branches: [main, staging, develop]
+    branches: [develop]
     paths-ignore:
-      - '.version'      # prevent infinite loop when this workflow commits .version
+      - '.version'
       - 'package.json'
+
+  # staging and main use pull_request merge trigger so the workflow always fires
+  # on merge regardless of which files changed (avoids the paths-ignore trap)
+  pull_request:
+    branches: [staging, main]
+    types: [closed]
+
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to bump version on'
+        required: true
+        default: 'develop'
+        type: choice
+        options: [develop, staging, main]
 
 permissions:
   contents: write
@@ -25,10 +36,28 @@ jobs:
     name: Bump version
     runs-on: ubuntu-latest
 
+    # For pull_request trigger: only run when the PR was actually merged
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
     steps:
+      - name: Determine branch
+        id: branch
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "name=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "name=${{ github.event.inputs.branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${{ github.event.pull_request.base.ref }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.branch.outputs.name }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -40,11 +69,11 @@ jobs:
       - name: Bump version
         id: bump
         run: |
-          BRANCH="${GITHUB_REF##*/}"
+          BRANCH="${{ steps.branch.outputs.name }}"
           CURRENT=$(cat .version | tr -d '[:space:]')
 
-          # Strip any existing pre-release suffix to get base semver
-          BASE=$(echo "$CURRENT" | sed 's/-dev\.[0-9]*//' | sed 's/-rc//')
+          # Strip any pre-release suffix to get clean base semver x.y.z
+          BASE=$(echo "$CURRENT" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
           MAJOR=$(echo "$BASE" | cut -d. -f1)
           MINOR=$(echo "$BASE" | cut -d. -f2)
           PATCH=$(echo "$BASE" | cut -d. -f3)
@@ -56,13 +85,11 @@ jobs:
             TAG="v${NEW_VERSION}"
 
           elif [[ "$BRANCH" == "staging" ]]; then
-            PATCH=$((PATCH + 1))
-            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-            TAG="v${NEW_VERSION}-rc"
+            # RC of current base — no patch bump, staging is a candidate of develop
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
+            TAG="v${NEW_VERSION}"
 
           elif [[ "$BRANCH" == "develop" ]]; then
-            # Use total commit count on this branch as the dev build number
-            # This is always unique and always increasing
             DEV_NUM=$(git rev-list --count HEAD)
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_NUM}"
             TAG="v${NEW_VERSION}"
@@ -76,7 +103,7 @@ jobs:
 
       - name: Sync version into package.json
         run: |
-          BASE=$(echo "${{ steps.bump.outputs.new_version }}" | sed 's/-dev\.[0-9]*//' | sed 's/-rc//')
+          BASE=$(echo "${{ steps.bump.outputs.new_version }}" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
@@ -87,16 +114,16 @@ jobs:
       - name: Commit version files
         run: |
           git add .version package.json
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
-          git push origin HEAD:${{ steps.bump.outputs.branch }}
+          git push origin HEAD:${{ steps.branch.outputs.name }}
 
       - name: Create Git tag
         run: |
-          # Delete existing tag if present (handles re-runs)
           git tag -d "${{ steps.bump.outputs.tag }}" 2>/dev/null || true
           git push origin ":refs/tags/${{ steps.bump.outputs.tag }}" 2>/dev/null || true
           git tag -a "${{ steps.bump.outputs.tag }}" \
-            -m "Release ${{ steps.bump.outputs.new_version }} from ${{ steps.bump.outputs.branch }}"
+            -m "Release ${{ steps.bump.outputs.new_version }} from ${{ steps.branch.outputs.name }}"
           git push origin "${{ steps.bump.outputs.tag }}"
 
       - name: Summary
@@ -105,6 +132,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| | |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | \`${{ steps.bump.outputs.branch }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ steps.branch.outputs.name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| New version | \`${{ steps.bump.outputs.new_version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Git tag | \`${{ steps.bump.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY

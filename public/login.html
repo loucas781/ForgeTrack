@@ -26,7 +26,7 @@
 
     <div class="auth-tabs">
       <a href="/login.html"  class="auth-tab active">Sign In</a>
-      <a href="/signup.html" class="auth-tab">Create Account</a>
+      <a href="/signup.html" class="auth-tab" id="signup-tab" style="display:none">Create Account</a>
       <div class="auth-tab-indicator" style="left:0"></div>
     </div>
 
@@ -51,11 +51,15 @@
         </div>
       </div>
 
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <a href="/forgot-password.html" style="font-size:12px;color:var(--brand);text-decoration:none">Forgot password?</a>
+      </div>
+
       <button type="submit" class="btn btn-primary btn-lg auth-submit" id="submit-btn">
         Sign In
       </button>
 
-      <p class="auth-switch">Don't have an account? <a href="/signup.html">Create one</a></p>
+      <p class="auth-switch" style="display:none">Don't have an account? <a href="/signup.html">Create one</a></p>
     </form>
   </div>
 
@@ -82,6 +86,36 @@
       errorEl.classList.remove('hidden')
     }
     function hideError() { errorEl.classList.add('hidden') }
+
+    // Show account deleted message if redirected from delete flow
+    if (new URLSearchParams(location.search).get('deleted') === '1') {
+      const banner = document.createElement('div')
+      banner.className = 'auth-error'
+      banner.style.cssText = 'background:rgba(0,135,90,.08);border-color:rgba(0,135,90,.3);color:var(--green)'
+      banner.textContent = '✓ Your account has been permanently deleted.'
+      document.getElementById('login-form').prepend(banner)
+    }
+
+    // Hide signup tab if registration is closed
+    fetch('/api/config', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(cfg => {
+        const signupAllowed = cfg.allowSignup !== false
+        const tab           = document.getElementById('signup-tab')
+        const indicator     = document.querySelector('.auth-tab-indicator')
+        const switchEl      = document.querySelector('.auth-switch')
+        if (signupAllowed) {
+          // Show the tab and restore the two-tab indicator width
+          if (tab)       { tab.style.display = ''; }
+          if (indicator) { indicator.style.width = '50%' }
+          if (switchEl)  { switchEl.style.display = '' }
+        } else {
+          // Keep tab hidden, stretch indicator to full width, hide "Create one" link
+          if (tab)       { tab.style.display = 'none' }
+          if (indicator) { indicator.style.width = '100%' }
+          if (switchEl)  { switchEl.style.display = 'none' }
+        }
+      }).catch(() => {})
 
     form.addEventListener('submit', async e => {
       e.preventDefault()

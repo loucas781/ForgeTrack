@@ -6,7 +6,8 @@ body.auth-page { display: flex; align-items: center; justify-content: center; mi
 .auth-tabs { display: flex; position: relative; background: var(--gray-100); border-bottom: 1px solid var(--border-2); }
 .auth-tab { flex: 1; padding: 12px 16px; text-align: center; font-size: 13px; font-weight: 500; color: var(--text-2); text-decoration: none; transition: color var(--t-base); position: relative; z-index: 1; }
 .auth-tab.active { color: var(--text); font-weight: 600; }
-.auth-tab-indicator { position: absolute; bottom: 0; width: 50%; height: 2px; background: var(--brand); border-radius: 2px 2px 0 0; transition: left var(--t-base); }
+.auth-tab-indicator { position: absolute; bottom: 0; width: 50%; height: 2px; background: var(--brand); border-radius: 2px 2px 0 0; transition: left var(--t-base), width var(--t-base); }
+.auth-tabs:has(.auth-tab:only-of-type) .auth-tab-indicator { width: 100%; }
 .auth-form { padding: 24px 32px 32px; display: flex; flex-direction: column; }
 .auth-heading { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
 .auth-subheading { font-size: 13px; color: var(--text-2); margin-bottom: 20px; }

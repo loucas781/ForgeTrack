@@ -13,5 +13,8 @@ data/
 .env
 .env.*
 
+# Runtime overrides (toggled via Settings UI)
+.runtime-overrides.json
+
 # Keep only the example template
 !.env.example

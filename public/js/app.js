@@ -102,6 +102,9 @@ function statusBadge(status) {
 
 // ─── Project key → initial letter icon ───────────────────────────────────────
 function projectIcon(project, size = 30) {
+  if (project.icon) {
+    return `<img src="${esc(project.icon)}" style="width:${size}px;height:${size}px;border-radius:4px;object-fit:cover;display:inline-block;flex-shrink:0" title="${esc(project.name)}" />`
+  }
   return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:4px;background:${project.color};color:#fff;font-weight:700;font-size:${Math.round(size*0.43)}px;flex-shrink:0">${esc((project.key||'?')[0])}</span>`
 }
 
@@ -143,11 +146,18 @@ async function initTopbar() {
   // Version + env chip next to logo
   const logoEl = document.getElementById('topbar-logo-text')
   if (logoEl && config.version) {
-    const v       = config.version
-    const base    = v.split('-')[0]
-    const isDev   = v.includes('-dev.')
-    const devNum  = isDev ? v.split('-dev.')[1] : null
-    const label   = isDev ? `v${base} <span style="opacity:.6;font-weight:400;font-size:11px">dev.${devNum}</span>` : `v${base}`
+    const v      = config.version
+    const base   = v.split('-')[0]
+    let label
+    if (v.includes('-dev.')) {
+      const devNum = v.split('-dev.')[1]
+      label = `v${base} <span style="opacity:.6;font-weight:400;font-size:11px">dev.${devNum}</span>`
+    } else if (v.includes('-rc')) {
+      const rcSuffix = v.split('-rc')[1] // e.g. '' or '.2'
+      label = `v${base} <span style="opacity:.75;font-weight:500;font-size:11px">rc${rcSuffix}</span>`
+    } else {
+      label = `v${base}`
+    }
     logoEl.insertAdjacentHTML('afterend',
       `<span class="topbar-version" title="${esc(v)}">${label}</span>`)
   }
@@ -224,20 +234,50 @@ async function initTopbar() {
       if (!q) { searchResults.classList.remove('show'); return }
       debounce = setTimeout(async () => {
         try {
-          const issues = await GET(`/issues?q=${encodeURIComponent(q)}`)
-          if (!issues.length) { searchResults.classList.remove('show'); return }
-          searchResults.innerHTML = issues.slice(0,8).map(i => `
-            <button class="search-result-item" onclick="location.href='/issue.html?id=${i.id}'">
-              ${typeIcon(i.type)}
-              <span class="search-result-key">${esc(i.key)}</span>
-              <span class="search-result-title">${esc(i.title)}</span>
-              <span class="search-result-project">${esc(i.project_name||'')}</span>
-            </button>`).join('')
+          const [issues, projects] = await Promise.all([
+            GET(`/issues?q=${encodeURIComponent(q)}`),
+            GET('/projects'),
+          ])
+          const matchedProjects = projects.filter(p =>
+            p.name.toLowerCase().includes(q.toLowerCase()) ||
+            p.key.toLowerCase().includes(q.toLowerCase())
+          ).slice(0, 3)
+          const matchedIssues = issues.slice(0, 6)
+
+          if (!matchedProjects.length && !matchedIssues.length) {
+            searchResults.innerHTML = `<div style="padding:12px 16px;font-size:13px;color:var(--text-3)">No results for "${esc(q)}"</div>`
+            searchResults.classList.add('show')
+            return
+          }
+
+          let html = ''
+          if (matchedProjects.length) {
+            html += `<div style="padding:6px 12px 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">Projects</div>`
+            html += matchedProjects.map(p => `
+              <button class="search-result-item" onclick="location.href='/project.html?id=${p.id}'">
+                ${projectIcon(p, 18)}
+                <span class="search-result-title" style="font-weight:500">${esc(p.name)}</span>
+                <span class="search-result-project">${esc(p.key)}</span>
+              </button>`).join('')
+          }
+          if (matchedIssues.length) {
+            html += `<div style="padding:6px 12px 2px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)${matchedProjects.length ? ';border-top:1px solid var(--border-2);margin-top:4px;padding-top:8px' : ''}">Issues</div>`
+            html += matchedIssues.map(i => `
+              <button class="search-result-item" onclick="location.href='/issue.html?id=${i.id}'">
+                ${typeIcon(i.type)}
+                <span class="search-result-key">${esc(i.key)}</span>
+                <span class="search-result-title">${esc(i.title)}</span>
+                <span class="search-result-project">${esc(i.project_name||'')}</span>
+              </button>`).join('')
+          }
+          searchResults.innerHTML = html
           searchResults.classList.add('show')
-        } catch {}
+        } catch { searchResults.classList.remove('show') }
       }, 250)
     })
     searchInput.addEventListener('blur', () => setTimeout(() => searchResults.classList.remove('show'), 200))
+    // Keyboard: Escape closes results
+    searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchResults.classList.remove('show'); searchInput.blur() } })
   }
   initAttachmentPicker()
 }
