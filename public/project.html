@@ -25,8 +25,16 @@
     injectShell({ project, activePage: view })
     await initTopbar()
 
+    const canManage = userCanManageProject(project)  // admin or project lead
+
     const content = document.getElementById('page-content')
     document.title = `${project.name} — ForgeTrack`
+
+    // Redirect members away from settings — they have no actions there
+    if (view === 'settings' && !canManage) {
+      location.href = `/project.html?id=${pid}&view=issues`
+      return
+    }
 
     if (view === 'settings') {
       await renderSettings(project, content)

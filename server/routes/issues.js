@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
+const { canEditIssue, canDeleteComment } = require('../permissions')
 
 router.use(requireAuth)
 
@@ -150,8 +151,15 @@ router.get('/:id', async (req, res) => {
 // ── PATCH /api/issues/:id ─────────────────────────────────────────────────────
 router.patch('/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT id FROM issues WHERE id = $1', [req.params.id])
+    const { rows } = await db.query(
+      'SELECT i.*, p.lead_id FROM issues i JOIN projects p ON p.id = i.project_id WHERE i.id = $1',
+      [req.params.id]
+    )
     if (!rows.length) return res.status(404).json({ error: 'Issue not found' })
+    const issue = rows[0]
+    const proj  = { id: issue.project_id, lead_id: issue.lead_id }
+    if (!canEditIssue(req.user, proj))
+      return res.status(403).json({ error: 'Only admins or the project lead can edit issues.' })
 
     const allowed = ['title','description','type','status','priority','assignee_id','story_points','due_date']
     const updates = {}
@@ -198,9 +206,15 @@ router.patch('/:id', async (req, res) => {
 // ── DELETE /api/issues/:id ────────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT id, key, title FROM issues WHERE id = $1', [req.params.id])
+    const { rows } = await db.query(
+      'SELECT i.id, i.key, i.title, i.project_id, p.lead_id FROM issues i JOIN projects p ON p.id = i.project_id WHERE i.id = $1',
+      [req.params.id]
+    )
     if (!rows.length) return res.status(404).json({ error: 'Issue not found' })
     const issue = rows[0]
+    const proj  = { id: issue.project_id, lead_id: issue.lead_id }
+    if (!canEditIssue(req.user, proj))
+      return res.status(403).json({ error: 'Only admins or the project lead can delete issues.' })
     await db.query('DELETE FROM issues WHERE id = $1', [req.params.id])
     audit(req.user.id, 'issue.delete', 'issue', issue.id, `${issue.key}: ${issue.title}`)
     res.json({ ok: true })
@@ -241,13 +255,18 @@ router.post('/:id/comments', async (req, res) => {
 router.delete('/:id/comments/:cid', async (req, res) => {
   try {
     const { rows } = await db.query(
-      'SELECT * FROM comments WHERE id = $1 AND issue_id = $2',
+      `SELECT c.*, p.lead_id as proj_lead_id, i.project_id
+       FROM comments c
+       JOIN issues i ON i.id = c.issue_id
+       JOIN projects p ON p.id = i.project_id
+       WHERE c.id = $1 AND c.issue_id = $2`,
       [req.params.cid, req.params.id]
     )
     if (!rows.length) return res.status(404).json({ error: 'Comment not found' })
     const comment = rows[0]
-    if (comment.author_id !== req.user.id && req.user.role !== 'admin')
-      return res.status(403).json({ error: "Cannot delete another user's comment." })
+    const proj    = { id: comment.project_id, lead_id: comment.proj_lead_id }
+    if (!canDeleteComment(req.user, comment, proj))
+      return res.status(403).json({ error: "You don't have permission to delete this comment." })
     await db.query('DELETE FROM comments WHERE id = $1', [req.params.cid])
     audit(req.user.id, 'comment.delete', 'issue', req.params.id, null, { preview: comment.body.slice(0, 80) })
     res.json({ ok: true })

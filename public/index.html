@@ -20,6 +20,7 @@
 
     const content = document.getElementById('page-content')
     const [projects, allIssues] = await Promise.all([GET('/projects'), GET('/issues')])
+    const canCreateProject = userCan('lead')
 
     const stats = {
       total:      allIssues.length,
@@ -38,10 +39,10 @@
             <h1>Your Work</h1>
             <p class="text-2 mt-4">Overview of all projects and recent activity</p>
           </div>
-          <button class="btn btn-primary" id="new-project-btn">
+          ${canCreateProject ? `<button class="btn btn-primary" id="new-project-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
             New Project
-          </button>
+          </button>` : ''}
         </div>
 
         <!-- Stats -->
@@ -61,11 +62,11 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
                 Projects
               </h3>
-              <button class="btn btn-ghost btn-sm" id="new-project-btn-2">+ Add</button>
+              ${canCreateProject ? `<button class="btn btn-ghost btn-sm" id="new-project-btn-2">+ Add</button>` : ''}
             </div>
             <div class="card" id="projects-list">
               ${projects.length === 0
-                ? `<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg><p>No projects yet</p><button class="btn btn-primary btn-sm" id="new-project-empty">Create your first project</button></div>`
+                ? `<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg><p>No projects yet</p>${canCreateProject ? '<button class="btn btn-primary btn-sm" id="new-project-empty">Create your first project</button>' : ''}</div>`
                 : projects.map(p => {
                     const open = allIssues.filter(i => i.project_id === p.id && i.status !== 'done' && i.status !== 'cancelled').length
                     const lead = p.lead_id ? { name: p.lead_name, initials: p.lead_initials, color: p.lead_color } : null

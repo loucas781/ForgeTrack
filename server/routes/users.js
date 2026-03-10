@@ -30,7 +30,7 @@ router.patch('/:id', async (req, res) => {
     if (id === req.user.id) return res.status(400).json({ error: 'You cannot modify your own account status here.' })
 
     // Prevent deactivating/demoting the last admin
-    if (target.role === 'admin' && (is_active === false || role === 'member')) {
+    if (target.role === 'admin' && (is_active === false || (role && role !== 'admin'))) {
       const { rows: admins } = await db.query("SELECT id FROM users WHERE role = 'admin' AND is_active = TRUE AND id != $1", [id])
       if (!admins.length) return res.status(400).json({ error: 'Cannot deactivate or demote the last active admin.' })
     }
@@ -38,7 +38,11 @@ router.patch('/:id', async (req, res) => {
     const updates = []
     const vals    = []
     if (is_active !== undefined) { updates.push(`is_active = $${vals.length + 1}`); vals.push(is_active) }
-    if (role      !== undefined) { updates.push(`role = $${vals.length + 1}`);      vals.push(role) }
+    if (role      !== undefined) {
+      if (!['member','lead','admin'].includes(role)) return res.status(400).json({ error: 'Invalid role.' })
+      updates.push(`role = $${vals.length + 1}`)
+      vals.push(role)
+    }
     if (!updates.length) return res.status(400).json({ error: 'Nothing to update' })
     vals.push(id)
 
@@ -84,7 +88,7 @@ router.delete('/:id', async (req, res) => {
     const { rows: [target] } = await db.query('SELECT id, name, role FROM users WHERE id = $1', [id])
     if (!target) return res.status(404).json({ error: 'User not found' })
     if (target.role === 'admin') {
-      const { rows: admins } = await db.query("SELECT id FROM users WHERE role = 'admin' AND id != $1", [id])
+      const { rows: admins } = await db.query("SELECT id FROM users WHERE role = 'admin' AND id != $1 AND is_active = TRUE", [id])
       if (!admins.length) return res.status(400).json({ error: 'Cannot delete the last admin.' })
     }
     await db.query('UPDATE issues SET assignee_id = NULL WHERE assignee_id = $1', [id])
