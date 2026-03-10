@@ -143,11 +143,18 @@ async function initTopbar() {
   // Version + env chip next to logo
   const logoEl = document.getElementById('topbar-logo-text')
   if (logoEl && config.version) {
-    const v       = config.version
-    const base    = v.split('-')[0]
-    const isDev   = v.includes('-dev.')
-    const devNum  = isDev ? v.split('-dev.')[1] : null
-    const label   = isDev ? `v${base} <span style="opacity:.6;font-weight:400;font-size:11px">dev.${devNum}</span>` : `v${base}`
+    const v      = config.version
+    const base   = v.split('-')[0]
+    let label
+    if (v.includes('-dev.')) {
+      const devNum = v.split('-dev.')[1]
+      label = `v${base} <span style="opacity:.6;font-weight:400;font-size:11px">dev.${devNum}</span>`
+    } else if (v.includes('-rc')) {
+      const rcSuffix = v.split('-rc')[1] // e.g. '' or '.2'
+      label = `v${base} <span style="opacity:.75;font-weight:500;font-size:11px">rc${rcSuffix}</span>`
+    } else {
+      label = `v${base}`
+    }
     logoEl.insertAdjacentHTML('afterend',
       `<span class="topbar-version" title="${esc(v)}">${label}</span>`)
   }

@@ -168,6 +168,25 @@
 
       <!-- Security / 2FA -->
       <div class="settings-panel" id="panel-security">
+        <div class="card section-card" id="https-toggle-card">
+          <h3 class="section-title">HTTPS Mode</h3>
+          <p class="text-2 text-sm" style="margin-bottom:16px">
+            When enabled, session cookies are only sent over secure HTTPS connections.
+            <strong>Only turn this on once you have a valid SSL certificate and are running behind HTTPS.</strong>
+            Enabling this on a plain HTTP server will silently break logins.
+          </p>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg)">
+            <div>
+              <div style="font-weight:600;font-size:13px">Secure cookies (COOKIE_SECURE)</div>
+              <div class="text-2 text-sm" id="https-status-text">Loading…</div>
+            </div>
+            <button class="btn" id="https-toggle-btn" style="min-width:80px" disabled>…</button>
+          </div>
+          <div style="margin-top:10px;padding:10px 14px;border-radius:var(--r-md);font-size:12px;display:flex;gap:8px;align-items:flex-start" id="https-warning-bar" style="display:none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            <span id="https-warning-text"></span>
+          </div>
+        </div>
         <div class="card section-card">
           <h3 class="section-title">Two-Factor Authentication (2FA)</h3>
           <p class="text-2 text-sm" style="margin-bottom:16px">
@@ -237,7 +256,7 @@
       tabBar.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.panel === id))
       document.querySelectorAll('.settings-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + id))
       history.replaceState(null, '', '#' + id)
-      if (id === 'security') renderTwoFA()
+      if (id === 'security') { renderHTTPS(); renderTwoFA() }
     }
     tabBar.querySelectorAll('.settings-tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.panel)))
     const hash = location.hash.replace('#', '')
@@ -263,6 +282,96 @@
 
     // ── 2FA ────────────────────────────────────────────────────────
     let twofaSetupData = null
+
+    // ── HTTPS / Cookie Secure toggle (admin only) ───────────────────
+    async function renderHTTPS() {
+      const card = document.getElementById('https-toggle-card')
+      if (!card) return
+      const cfg = await GET('/config')
+      if (cfg.user?.role !== 'admin') { card.style.display = 'none'; return }
+
+      card.innerHTML = `
+        <h3 class="section-title">HTTPS / Reverse Proxy</h3>
+        <p class="text-2 text-sm" style="margin-bottom:16px">
+          Configure these once you are running behind a reverse proxy (e.g. Nginx Proxy Manager) with a valid SSL certificate.
+          <strong>Do not enable Secure Cookies on plain HTTP — it will lock everyone out.</strong>
+        </p>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <!-- Secure cookies row -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg)">
+            <div>
+              <div style="font-weight:600;font-size:13px">Secure Cookies</div>
+              <div class="text-2 text-sm" id="cookie-status-text"></div>
+            </div>
+            <button class="btn btn-sm" id="cookie-toggle-btn" style="min-width:80px">…</button>
+          </div>
+
+          <!-- Trust proxy row -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg)">
+            <div>
+              <div style="font-weight:600;font-size:13px">Trust Reverse Proxy</div>
+              <div class="text-2 text-sm" id="proxy-status-text"></div>
+            </div>
+            <button class="btn btn-sm" id="proxy-toggle-btn" style="min-width:80px">…</button>
+          </div>
+        </div>
+
+        <div id="https-warning-bar" style="display:none;margin-top:12px;padding:10px 14px;border-radius:var(--r-md);font-size:12px;display:flex;gap:8px;align-items:flex-start">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <span id="https-warning-text"></span>
+        </div>`
+
+      let cookieSecure = cfg.cookieSecure
+      let trustProxy   = cfg.trustProxy
+
+      function updateCookieUI() {
+        const btn  = document.getElementById('cookie-toggle-btn')
+        const text = document.getElementById('cookie-status-text')
+        btn.textContent = cookieSecure ? 'Disable' : 'Enable'
+        btn.className   = `btn btn-sm ${cookieSecure ? 'btn-danger' : 'btn-primary'}`
+        text.textContent = cookieSecure ? '🔒 Enabled — HTTPS only' : '⚠️ Disabled — HTTP allowed'
+        text.style.color = cookieSecure ? 'var(--green)' : 'var(--orange)'
+      }
+
+      function updateProxyUI() {
+        const btn  = document.getElementById('proxy-toggle-btn')
+        const text = document.getElementById('proxy-status-text')
+        btn.textContent = trustProxy ? 'Disable' : 'Enable'
+        btn.className   = `btn btn-sm ${trustProxy ? 'btn-danger' : 'btn-primary'}`
+        text.textContent = trustProxy
+          ? '✓ Enabled — requires server restart to take effect'
+          : '✗ Disabled — enable when behind Nginx/Caddy etc.'
+        text.style.color = trustProxy ? 'var(--green)' : 'var(--text-3)'
+      }
+
+      updateCookieUI()
+      updateProxyUI()
+
+      document.getElementById('cookie-toggle-btn').addEventListener('click', async () => {
+        const action = cookieSecure ? 'disable' : 'enable'
+        if (!confirm(`${action === 'enable' ? 'Only enable secure cookies if HTTPS is fully working.\n\nEnabling on plain HTTP will lock everyone out.' : 'Disable secure cookies?\n\nCookies will be sent over HTTP.'}`)) return
+        try {
+          const result = await PATCH('/config', { cookieSecure: !cookieSecure })
+          cookieSecure = result.cookieSecure
+          updateCookieUI()
+          toast(`Secure cookies ${cookieSecure ? 'enabled' : 'disabled'}`, 'success')
+        } catch (err) { toast(err.message, 'error') }
+      })
+
+      document.getElementById('proxy-toggle-btn').addEventListener('click', async () => {
+        if (!confirm(`${trustProxy ? 'Disable' : 'Enable'} reverse proxy trust?\n\nThis requires a server restart to take effect.`)) return
+        try {
+          const result = await PATCH('/config', { trustProxy: !trustProxy })
+          trustProxy = result.trustProxy
+          updateProxyUI()
+          const bar  = document.getElementById('https-warning-bar')
+          const text = document.getElementById('https-warning-text')
+          bar.style.cssText = 'display:flex;margin-top:12px;padding:10px 14px;border-radius:var(--r-md);font-size:12px;gap:8px;align-items:flex-start;background:rgba(255,153,0,.08);border:1px solid rgba(255,153,0,.3);color:var(--text-1)'
+          text.textContent = 'Restart the ForgeTrack service for the proxy change to take effect: systemctl restart forgetrack'
+        } catch (err) { toast(err.message, 'error') }
+      })
+    }
 
     async function renderTwoFA() {
       const area = document.getElementById('twofa-area')

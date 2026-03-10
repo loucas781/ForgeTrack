@@ -17,6 +17,7 @@ if [[ "$APP_ENV" != "development" && "$APP_ENV" != "staging" && "$APP_ENV" != "p
 fi
 COOKIE_SECURE="false"
 [[ "$APP_ENV" == "production" || "$APP_ENV" == "staging" ]] && COOKIE_SECURE="true"
+# It must stay false while running over plain HTTP or logins will silently fail
 msg_ok "Deploying environment: ${APP_ENV}"
 
 # ── 1. OS update ──────────────────────────────────────────────────────────────

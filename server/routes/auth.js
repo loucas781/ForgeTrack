@@ -217,3 +217,73 @@ router.post('/2fa/disable', requireAuth, async (req, res) => {
 })
 
 module.exports = router
+
+// ── POST /api/auth/forgot-password ────────────────────────────────────────────
+// Generates a reset token. No email — returns token directly (admin shares it).
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body
+  if (!email) return res.status(400).json({ error: 'Email required' })
+  try {
+    const { rows: [user] } = await db.query('SELECT id, name FROM users WHERE email = $1', [email.toLowerCase().trim()])
+    // Always return success to avoid email enumeration
+    if (!user) return res.json({ ok: true, message: 'If that email exists, a reset token has been generated.' })
+
+    // Expire old tokens for this user
+    await db.query('UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE', [user.id])
+
+    const token    = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '') // 64 char token
+    const expires  = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+    await db.query(
+      'INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1,$2,$3,$4)',
+      [uuidv4(), user.id, token, expires]
+    )
+    res.json({ ok: true, token, message: `Reset token generated for ${user.name}. Share this link with the user.` })
+  } catch (err) {
+    console.error('forgot password:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/auth/reset-password ─────────────────────────────────────────────
+router.post('/reset-password', async (req, res) => {
+  const { token, password } = req.body
+  if (!token || !password) return res.status(400).json({ error: 'Token and password required' })
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
+  try {
+    const { rows: [row] } = await db.query(
+      `SELECT r.id, r.user_id, r.expires_at, r.used
+       FROM password_reset_tokens r
+       WHERE r.token = $1`, [token]
+    )
+    if (!row)        return res.status(400).json({ error: 'Invalid or expired reset link' })
+    if (row.used)    return res.status(400).json({ error: 'This reset link has already been used' })
+    if (new Date(row.expires_at) < new Date()) return res.status(400).json({ error: 'Reset link has expired' })
+
+    const hash = await bcrypt.hash(password, 12)
+    await db.query('UPDATE users SET password = $1 WHERE id = $2', [hash, row.user_id])
+    await db.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [row.id])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('reset password:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── GET /api/auth/reset-password/validate ────────────────────────────────────
+router.get('/reset-password/validate', async (req, res) => {
+  const { token } = req.query
+  if (!token) return res.status(400).json({ error: 'Token required' })
+  try {
+    const { rows: [row] } = await db.query(
+      `SELECT r.used, r.expires_at, u.name, u.email
+       FROM password_reset_tokens r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.token = $1`, [token]
+    )
+    if (!row || row.used || new Date(row.expires_at) < new Date())
+      return res.status(400).json({ error: 'Invalid or expired reset link' })
+    res.json({ ok: true, name: row.name, email: row.email })
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
