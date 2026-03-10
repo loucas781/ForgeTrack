@@ -6,6 +6,13 @@ const { v4: uuidv4 } = require('uuid')
 const { authenticator } = require('otplib')
 const db      = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
+const emailSvc = require('../email')
+const fs       = require('fs')
+const path     = require('path')
+
+function loadOverrides() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../.runtime-overrides.json'), 'utf8')) } catch { return {} }
+}
 
 const COLORS = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 
@@ -36,31 +43,42 @@ function makeToken(user) {
 // ── POST /api/auth/signup ─────────────────────────────────────────────────────
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password } = req.body
-    if (!name?.trim() || !email?.trim() || !password)
+    // Check if open signup is allowed
+    const overrides = loadOverrides()
+    const { rows: [{ count: userCount }] } = await db.query('SELECT COUNT(*)::int as count FROM users')
+    const allowSignup = (overrides.ALLOW_SIGNUP ?? 'true') !== 'false'
+    // Always allow the very first user (creates the initial admin)
+    if (!allowSignup && userCount > 0)
+      return res.status(403).json({ error: 'Open registration is disabled. Contact an admin to create an account.' })
+
+    const { name, email: emailAddr, password } = req.body
+    if (!name?.trim() || !emailAddr?.trim() || !password)
       return res.status(400).json({ error: 'All fields are required.' })
     if (password.length < 6)
       return res.status(400).json({ error: 'Password must be at least 6 characters.' })
-    if (!/\S+@\S+\.\S+/.test(email))
+    if (!/\S+@\S+\.\S+/.test(emailAddr))
       return res.status(400).json({ error: 'Please enter a valid email address.' })
 
-    const norm = email.trim().toLowerCase()
+    const norm = emailAddr.trim().toLowerCase()
     const { rows: existing } = await db.query('SELECT id FROM users WHERE email = $1', [norm])
     if (existing.length) return res.status(409).json({ error: 'An account with this email already exists.' })
 
-    const { rows: [{ count }] } = await db.query('SELECT COUNT(*)::int as count FROM users')
     const hash     = await bcrypt.hash(password, 12)
-    const colorIdx = count % COLORS.length
+    const colorIdx = userCount % COLORS.length
     const id       = uuidv4()
 
     await db.query(
-      `INSERT INTO users (id, name, email, password, initials, color, role)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [id, name.trim(), norm, hash, getInitials(name), COLORS[colorIdx], count === 0 ? 'admin' : 'member']
+      `INSERT INTO users (id, name, email, password, initials, color, role) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, name.trim(), norm, hash, getInitials(name), COLORS[colorIdx], userCount === 0 ? 'admin' : 'member']
     )
     const { rows: [user] } = await db.query(
       'SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = $1', [id]
     )
+
+    // Send welcome email if SMTP is configured (non-blocking)
+    const origin = process.env.APP_URL || ''
+    emailSvc.sendWelcome({ to: norm, name: name.trim(), loginUrl: origin + '/login.html' }).catch(() => {})
+
     res.cookie('token', makeToken(user), cookieOpts())
     res.json({ ok: true, user })
   } catch (err) {
@@ -216,28 +234,102 @@ router.post('/2fa/disable', requireAuth, async (req, res) => {
   }
 })
 
+// ── DELETE /api/auth/account ──────────────────────────────────────────────────
+router.delete('/account', requireAuth, async (req, res) => {
+  try {
+    const { rows: [user] } = await db.query('SELECT id, role FROM users WHERE id = $1', [req.user.id])
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    // If the user is the last admin, block deletion
+    if (user.role === 'admin') {
+      const { rows: admins } = await db.query("SELECT id FROM users WHERE role = 'admin' AND id != $1", [user.id])
+      if (!admins.length)
+        return res.status(400).json({ error: 'You are the only admin. Promote another user to admin before deleting your account.' })
+    }
+
+    // Unassign issues, then delete account (cascade will handle the rest)
+    await db.query('UPDATE issues SET assignee_id = NULL WHERE assignee_id = $1', [user.id])
+    await db.query('DELETE FROM users WHERE id = $1', [user.id])
+
+    // Clear session cookie
+    res.clearCookie('token', { httpOnly: true, sameSite: 'lax', secure: process.env.COOKIE_SECURE === 'true' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('delete account:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/auth/invite — admin creates account and optionally emails creds ──
+router.post('/invite', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const { name, email: emailAddr, role = 'member', sendEmail = true } = req.body
+  if (!name?.trim() || !emailAddr?.trim()) return res.status(400).json({ error: 'Name and email required' })
+  if (!/\S+@\S+\.\S+/.test(emailAddr)) return res.status(400).json({ error: 'Invalid email address' })
+
+  try {
+    const norm = emailAddr.trim().toLowerCase()
+    const { rows: existing } = await db.query('SELECT id FROM users WHERE email = $1', [norm])
+    if (existing.length) return res.status(409).json({ error: 'An account with this email already exists.' })
+
+    const { rows: [{ count }] } = await db.query('SELECT COUNT(*)::int as count FROM users')
+    // Generate a random temp password
+    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase() + '!'
+    const hash     = await bcrypt.hash(tempPassword, 12)
+    const colorIdx = count % COLORS.length
+    const id       = uuidv4()
+
+    await db.query(
+      `INSERT INTO users (id, name, email, password, initials, color, role) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, name.trim(), norm, hash, getInitials(name), COLORS[colorIdx], role === 'admin' ? 'admin' : 'member']
+    )
+
+    const origin = process.env.APP_URL || ''
+    let emailSent = false
+    if (sendEmail && emailSvc.getSmtpConfig().enabled) {
+      const result = await emailSvc.sendAdminInvite({ to: norm, name: name.trim(), tempPassword, loginUrl: origin + '/login.html' })
+      emailSent = result.ok
+    }
+
+    res.json({ ok: true, emailSent, tempPassword: emailSent ? null : tempPassword })
+  } catch (err) {
+    console.error('invite:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router
 
 // ── POST /api/auth/forgot-password ────────────────────────────────────────────
-// Generates a reset token. No email — returns token directly (admin shares it).
 router.post('/forgot-password', async (req, res) => {
-  const { email } = req.body
-  if (!email) return res.status(400).json({ error: 'Email required' })
+  const { email: emailAddr } = req.body
+  if (!emailAddr) return res.status(400).json({ error: 'Email required' })
   try {
-    const { rows: [user] } = await db.query('SELECT id, name FROM users WHERE email = $1', [email.toLowerCase().trim()])
-    // Always return success to avoid email enumeration
-    if (!user) return res.json({ ok: true, message: 'If that email exists, a reset token has been generated.' })
+    const { rows: [user] } = await db.query('SELECT id, name FROM users WHERE email = $1', [emailAddr.toLowerCase().trim()])
+    if (!user) return res.json({ ok: true, emailSent: false, message: 'If that email exists, a reset token has been generated.' })
 
-    // Expire old tokens for this user
+    // Expire old tokens
     await db.query('UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE', [user.id])
 
-    const token    = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '') // 64 char token
-    const expires  = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+    const token   = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')
+    const expires = new Date(Date.now() + 60 * 60 * 1000)
     await db.query(
       'INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1,$2,$3,$4)',
       [uuidv4(), user.id, token, expires]
     )
-    res.json({ ok: true, token, message: `Reset token generated for ${user.name}. Share this link with the user.` })
+
+    const origin   = process.env.APP_URL || ''
+    const resetUrl = `${origin}/reset-password.html?token=${token}`
+    const smtp     = emailSvc.getSmtpConfig()
+
+    if (smtp.enabled) {
+      const result = await emailSvc.sendPasswordReset({ to: emailAddr.toLowerCase().trim(), name: user.name, resetUrl })
+      if (result.ok) return res.json({ ok: true, emailSent: true })
+      // Email failed — fall through to return token directly
+    }
+
+    // No SMTP or send failed: return token so admin/user can share it manually
+    res.json({ ok: true, emailSent: false, token, resetUrl, message: `Reset link generated for ${user.name}.` })
   } catch (err) {
     console.error('forgot password:', err.message)
     res.status(500).json({ error: 'Server error' })

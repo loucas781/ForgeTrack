@@ -77,12 +77,17 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
   (async () => {
-    const TABS = [
-      { id:'appearance', label:'Appearance', icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
-      { id:'team',       label:'Team',       icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
-      { id:'security',   label:'Security',   icon:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
-      { id:'build',      label:'Build Info', icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+    const ALL_TABS = [
+      { id:'appearance',    label:'Appearance',    adminOnly: false, icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
+      { id:'team',          label:'Team',          adminOnly: false, icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
+      { id:'security',      label:'Security',      adminOnly: false, icon:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+      { id:'email',         label:'Email',         adminOnly: true,  icon:'<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
+      { id:'notifications', label:'Notifications', adminOnly: false, icon:'<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>' },
+      { id:'account',       label:'Account',       adminOnly: false, icon:'<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+      { id:'build',         label:'Build Info',    adminOnly: false, icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
     ]
+    const isAdmin = me?.role === 'admin'
+    const TABS = ALL_TABS.filter(t => !t.adminOnly || isAdmin)
 
     injectShell()
     await initTopbar()
@@ -148,9 +153,35 @@
 
       <!-- Team -->
       <div class="settings-panel" id="panel-team">
+        ${me?.role === 'admin' ? `
         <div class="card section-card">
-          <h3 class="section-title">Members (${users.length})</h3>
-          <p class="text-2 text-sm" style="margin-bottom:16px">New members sign up at <code style="font-size:11px;background:var(--gray-100);padding:1px 6px;border-radius:3px">/signup.html</code></p>
+          <h3 class="section-title">Invite Member</h3>
+          <p class="text-2 text-sm" style="margin-bottom:16px">Create an account for a new team member. ${config.smtpEnabled ? 'An invitation email will be sent with their login details.' : 'SMTP is not configured — the temporary password will be shown here for you to share manually.'}</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Full name</label>
+              <input class="form-control" id="invite-name" placeholder="Jane Smith" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input class="form-control" id="invite-email" type="email" placeholder="jane@company.com" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <select class="form-control" id="invite-role">
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="invite-btn" style="margin-top:4px">Create Account</button>
+          <div id="invite-result" style="display:none;margin-top:12px;padding:12px 14px;border-radius:var(--r-md);font-size:13px"></div>
+        </div>` : ''}
+        <div class="card section-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 class="section-title" style="margin:0">Members (${users.length})</h3>
+            ${config.allowSignup ? `<span class="text-3 text-sm">Open signup: <a href="/signup.html" style="color:var(--brand)">/signup.html</a></span>` : `<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">Signup disabled</span>`}
+          </div>
           ${users.map(u => `
             <div class="member-row">
               ${avatarHtml(u, 36)}
@@ -168,25 +199,7 @@
 
       <!-- Security / 2FA -->
       <div class="settings-panel" id="panel-security">
-        <div class="card section-card" id="https-toggle-card">
-          <h3 class="section-title">HTTPS Mode</h3>
-          <p class="text-2 text-sm" style="margin-bottom:16px">
-            When enabled, session cookies are only sent over secure HTTPS connections.
-            <strong>Only turn this on once you have a valid SSL certificate and are running behind HTTPS.</strong>
-            Enabling this on a plain HTTP server will silently break logins.
-          </p>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg)">
-            <div>
-              <div style="font-weight:600;font-size:13px">Secure cookies (COOKIE_SECURE)</div>
-              <div class="text-2 text-sm" id="https-status-text">Loading…</div>
-            </div>
-            <button class="btn" id="https-toggle-btn" style="min-width:80px" disabled>…</button>
-          </div>
-          <div style="margin-top:10px;padding:10px 14px;border-radius:var(--r-md);font-size:12px;display:flex;gap:8px;align-items:flex-start" id="https-warning-bar" style="display:none">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-            <span id="https-warning-text"></span>
-          </div>
-        </div>
+        ${isAdmin ? `<div class="card section-card" id="https-toggle-card"></div>` : ''}
         <div class="card section-card">
           <h3 class="section-title">Two-Factor Authentication (2FA)</h3>
           <p class="text-2 text-sm" style="margin-bottom:16px">
@@ -211,8 +224,132 @@
         </div>
       </div>
 
-      <!-- Build info -->
-      <div class="settings-panel" id="panel-build">
+      <!-- Email -->
+      <div class="settings-panel" id="panel-email">
+        <div class="card section-card" id="email-admin-only-notice" style="display:none">
+          <p class="text-2 text-sm">Email settings are only available to admins.</p>
+        </div>
+        <div id="email-config-area">
+          <div class="card section-card">
+            <h3 class="section-title">SMTP Configuration</h3>
+            <p class="text-2 text-sm" style="margin-bottom:16px">Configure an outgoing mail server to enable password reset emails and user invitations. Credentials are stored locally and never committed to git.</p>
+            <div id="smtp-status-bar" style="display:none;padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" class="smtp-grid">
+              <div class="form-group" style="grid-column:1/-1">
+                <label class="form-label">SMTP Host</label>
+                <input class="form-control" id="smtp-host" placeholder="smtp.gmail.com" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Port</label>
+                <input class="form-control" id="smtp-port" type="number" placeholder="587" value="587" />
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:10px;padding-top:24px">
+                <input type="checkbox" id="smtp-secure" style="width:16px;height:16px;accent-color:var(--brand)" />
+                <label for="smtp-secure" style="font-size:13px;font-weight:500;cursor:pointer">TLS (port 465)</label>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Username / Email</label>
+                <input class="form-control" id="smtp-user" type="email" placeholder="noreply@yourcompany.com" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="pw-wrap">
+                  <input class="form-control" id="smtp-pass" type="password" placeholder="App password or SMTP password" autocomplete="new-password" />
+                  <button type="button" class="pw-toggle" id="smtp-pw-toggle" title="Show/hide">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">From Name</label>
+                <input class="form-control" id="smtp-from-name" placeholder="ForgeTrack" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">From Address</label>
+                <input class="form-control" id="smtp-from-addr" type="email" placeholder="noreply@yourcompany.com" />
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="save-smtp-btn">Save</button>
+              <button class="btn btn-secondary" id="test-smtp-btn">Send Test Email</button>
+              <button class="btn btn-secondary" id="clear-smtp-btn" style="margin-left:auto;color:var(--red)">Clear config</button>
+            </div>
+            <div id="smtp-save-msg" style="display:none;margin-top:10px;font-size:13px"></div>
+          </div>
+
+          <div class="card section-card">
+            <h3 class="section-title">Registration</h3>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+              <div>
+                <div style="font-weight:600;font-size:13px;margin-bottom:4px">Open signup</div>
+                <p class="text-2 text-sm" style="margin:0">When enabled, anyone with access to the URL can create an account. Disable to require all accounts to be created by an admin.</p>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0">
+                <input type="checkbox" id="allow-signup-toggle" style="width:16px;height:16px;accent-color:var(--brand)" />
+                <span id="allow-signup-label" style="font-size:13px;font-weight:500;white-space:nowrap"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="settings-panel" id="panel-notifications">
+        <div class="card section-card">
+          <h3 class="section-title">In-App Notifications</h3>
+          <p class="text-2 text-sm" style="margin-bottom:16px">Control which activity generates notifications for you.</p>
+          <div id="notif-rows" style="display:flex;flex-direction:column;gap:2px"></div>
+          <button class="btn btn-primary" id="save-notif-btn" style="margin-top:16px">Save preferences</button>
+          <span id="notif-saved" style="display:none;margin-left:12px;font-size:13px;color:var(--green)">✓ Saved</span>
+        </div>
+        <div class="card section-card">
+          <h3 class="section-title">Digest &amp; Reminders</h3>
+          <p class="text-2 text-sm" style="margin-bottom:16px">These run server-side. Email delivery requires an SMTP server to be configured.</p>
+          <div style="display:flex;flex-direction:column;gap:10px" id="digest-rows"></div>
+          <p class="text-3 text-sm" style="margin-top:12px">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            Email notifications are not yet available in this version of ForgeTrack.
+          </p>
+        </div>
+      </div>
+
+      <!-- Account -->
+      <div class="settings-panel" id="panel-account">
+        <div class="card section-card">
+          <h3 class="section-title">Active Sessions</h3>
+          <p class="text-2 text-sm" style="margin-bottom:16px">You are currently signed in. ForgeTrack uses HTTP-only cookies — only one active session per browser is tracked.</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg)">
+            <div>
+              <div style="font-weight:600;font-size:13px">Current session</div>
+              <div class="text-3 text-sm" id="session-browser-info">This browser</div>
+            </div>
+            <span style="font-size:11px;font-weight:700;text-transform:uppercase;padding:3px 10px;border-radius:10px;background:rgba(0,135,90,.1);color:var(--green);border:1px solid rgba(0,135,90,.25)">Active</span>
+          </div>
+          <button class="btn btn-secondary" id="sign-out-all-btn" style="margin-top:12px">Sign out everywhere</button>
+        </div>
+
+        <div class="card section-card">
+          <h3 class="section-title">Export My Data</h3>
+          <p class="text-2 text-sm" style="margin-bottom:16px">Download a JSON file containing all your account data, issues you created, and comments.</p>
+          <button class="btn btn-secondary" id="export-data-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right:6px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Download my data
+          </button>
+        </div>
+
+        <div class="card section-card" style="border-color:rgba(222,53,11,.2)">
+          <h3 class="section-title" style="color:var(--red,#de350b)">Danger Zone</h3>
+          <p class="text-2 text-sm" style="margin-bottom:16px">
+            Permanently delete your account and all associated data. This cannot be undone.
+            ${me?.role === 'admin' ? '<br><strong>Note:</strong> As an admin, deleting your account will only work if at least one other admin exists.' : ''}
+          </p>
+          <div id="delete-account-area">
+            <button class="btn btn-danger" id="delete-account-btn">Delete my account</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Build info -->\n      <div class="settings-panel" id="panel-build">
         <div class="card section-card">
           <h3 class="section-title">Version</h3>
           <div style="display:flex;align-items:center;gap:20px;padding:16px;background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-lg);margin-bottom:16px;flex-wrap:wrap;gap:12px">
@@ -256,7 +393,44 @@
       tabBar.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.panel === id))
       document.querySelectorAll('.settings-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + id))
       history.replaceState(null, '', '#' + id)
-      if (id === 'security') { renderHTTPS(); renderTwoFA() }
+      if (id === 'security')      { renderHTTPS(); renderTwoFA() }
+      if (id === 'notifications') { renderNotifications() }
+      if (id === 'account')       { renderAccount() }
+      if (id === 'email')         { renderEmail() }
+      if (id === 'team')          { wireInvite() }
+    }
+
+    // ── Invite member (Team tab) ───────────────────────────────────
+    function wireInvite() {
+      const btn = document.getElementById('invite-btn')
+      if (!btn || btn.dataset.wired) return
+      btn.dataset.wired = '1'
+      btn.addEventListener('click', async () => {
+        const name  = document.getElementById('invite-name').value.trim()
+        const email = document.getElementById('invite-email').value.trim()
+        const role  = document.getElementById('invite-role').value
+        const res   = document.getElementById('invite-result')
+        if (!name || !email) { toast('Please fill in name and email', 'error'); return }
+        btn.disabled = true; btn.textContent = 'Creating…'
+        try {
+          const data = await POST('/auth/invite', { name, email, role, sendEmail: true })
+          res.style.cssText = 'display:block;margin-top:12px;padding:12px 14px;border-radius:var(--r-md);font-size:13px;background:rgba(0,135,90,.08);border:1px solid rgba(0,135,90,.25);color:var(--text-1)'
+          if (data.emailSent) {
+            res.innerHTML = `✓ Account created and invitation email sent to <strong>${email}</strong>.`
+          } else {
+            res.innerHTML = `✓ Account created for <strong>${name}</strong>.<br>
+              <span class="text-2">Email not sent (SMTP not configured). Temporary password:</span><br>
+              <code style="font-family:var(--mono);font-size:13px;background:var(--gray-100);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:6px">${data.tempPassword}</code><br>
+              <span class="text-3 text-sm" style="margin-top:4px;display:block">Share this with the user and ask them to change it after signing in.</span>`
+          }
+          document.getElementById('invite-name').value = ''
+          document.getElementById('invite-email').value = ''
+        } catch (err) {
+          res.style.cssText = 'display:block;margin-top:12px;padding:12px 14px;border-radius:var(--r-md);font-size:13px;background:rgba(222,53,11,.06);border:1px solid rgba(222,53,11,.2);color:var(--red,#de350b)'
+          res.textContent = err.message
+        }
+        btn.disabled = false; btn.textContent = 'Create Account'
+      })
     }
     tabBar.querySelectorAll('.settings-tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.panel)))
     const hash = location.hash.replace('#', '')
@@ -282,6 +456,245 @@
 
     // ── 2FA ────────────────────────────────────────────────────────
     let twofaSetupData = null
+
+    // ── Notifications panel ────────────────────────────────────────
+    const NOTIF_PREFS_KEY = 'ft-notif-prefs'
+    const NOTIF_OPTIONS = [
+      { key: 'issue_assigned',    label: 'Issue assigned to me',         defaultOn: true  },
+      { key: 'issue_mentioned',   label: 'I\'m mentioned in a comment',  defaultOn: true  },
+      { key: 'issue_status',      label: 'Status changes on my issues',  defaultOn: true  },
+      { key: 'issue_comment',     label: 'New comments on issues I follow', defaultOn: false },
+      { key: 'project_added',     label: 'I\'m added to a project',      defaultOn: true  },
+      { key: 'issue_priority',    label: 'Priority changed on my issues',defaultOn: false },
+      { key: 'daily_digest',      label: 'Daily open-issues digest',     defaultOn: false },
+    ]
+
+    function renderNotifications() {
+      const prefs = JSON.parse(localStorage.getItem(NOTIF_PREFS_KEY) || '{}')
+      const rows  = document.getElementById('notif-rows')
+      const digestRows = document.getElementById('digest-rows')
+      if (!rows || rows.dataset.rendered) return
+      rows.dataset.rendered = '1'
+
+      NOTIF_OPTIONS.slice(0, -1).forEach(opt => {
+        const on = prefs[opt.key] !== undefined ? prefs[opt.key] : opt.defaultOn
+        rows.insertAdjacentHTML('beforeend', `
+          <label style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:var(--r-md);cursor:pointer;background:var(--gray-50);border:1px solid var(--border-2)">
+            <span style="font-size:13px">${opt.label}</span>
+            <input type="checkbox" data-key="${opt.key}" ${on ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--brand);cursor:pointer" />
+          </label>`)
+      })
+
+      // Digest row
+      const digestOpt = NOTIF_OPTIONS.at(-1)
+      const digestOn  = prefs[digestOpt.key] !== undefined ? prefs[digestOpt.key] : digestOpt.defaultOn
+      digestRows.innerHTML = `
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:var(--r-md);cursor:pointer;background:var(--gray-50);border:1px solid var(--border-2);opacity:.6" title="Not yet available">
+          <span style="font-size:13px">${digestOpt.label}</span>
+          <input type="checkbox" disabled ${digestOn ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--brand)" />
+        </label>`
+
+      document.getElementById('save-notif-btn').addEventListener('click', () => {
+        const updated = {}
+        rows.querySelectorAll('input[data-key]').forEach(cb => { updated[cb.dataset.key] = cb.checked })
+        localStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(updated))
+        const saved = document.getElementById('notif-saved')
+        saved.style.display = 'inline'
+        setTimeout(() => saved.style.display = 'none', 2500)
+      })
+    }
+
+    // ── Account panel ──────────────────────────────────────────────
+    function renderAccount() {
+      const area = document.getElementById('delete-account-area')
+      if (area.dataset.rendered) return
+      area.dataset.rendered = '1'
+
+      // Populate session browser info
+      const ua = navigator.userAgent
+      const browserName = ua.includes('Firefox') ? 'Firefox' : ua.includes('Edg') ? 'Edge' : ua.includes('Chrome') ? 'Chrome' : ua.includes('Safari') ? 'Safari' : 'Unknown browser'
+      const osName = ua.includes('Win') ? 'Windows' : ua.includes('Mac') ? 'macOS' : ua.includes('Linux') ? 'Linux' : ua.includes('iPhone') || ua.includes('iPad') ? 'iOS' : ua.includes('Android') ? 'Android' : ''
+      document.getElementById('session-browser-info').textContent = `${browserName}${osName ? ' on ' + osName : ''}`
+
+      // Sign out everywhere
+      document.getElementById('sign-out-all-btn').addEventListener('click', async () => {
+        if (!confirm('Sign out of all sessions?\n\nYou will be redirected to the login page.')) return
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+        window.location.href = '/login.html'
+      })
+
+      // Export data
+      document.getElementById('export-data-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('export-data-btn')
+        btn.textContent = 'Preparing…'
+        btn.disabled = true
+        try {
+          const [me, myIssues, projects] = await Promise.all([
+            GET('/auth/me'), GET('/issues'), GET('/projects')
+          ])
+          const created  = myIssues.filter(i => i.creator_id === me.id || i.created_by === me.id)
+          const assigned = myIssues.filter(i => i.assignee_id === me.id)
+          const export_data = {
+            exported_at: new Date().toISOString(),
+            account: { id: me.id, name: me.name, email: me.email, role: me.role, created_at: me.created_at },
+            issues_created: created,
+            issues_assigned: assigned,
+            projects_member_count: projects.length,
+          }
+          const blob = new Blob([JSON.stringify(export_data, null, 2)], { type: 'application/json' })
+          const url  = URL.createObjectURL(blob)
+          const a    = document.createElement('a')
+          a.href = url; a.download = `forgetrack-export-${me.name.replace(/\s+/g,'-').toLowerCase()}-${Date.now()}.json`
+          a.click()
+          URL.revokeObjectURL(url)
+        } catch (err) { toast(err.message, 'error') }
+        finally { btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right:6px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download my data'; btn.disabled = false }
+      })
+
+      // Delete account
+      document.getElementById('delete-account-btn').addEventListener('click', () => {
+        area.innerHTML = `
+          <div style="background:rgba(222,53,11,.05);border:1px solid rgba(222,53,11,.2);border-radius:var(--r-lg);padding:16px">
+            <p style="font-size:13px;font-weight:600;color:var(--red,#de350b);margin:0 0 6px">This will permanently delete your account.</p>
+            <p class="text-2 text-sm" style="margin:0 0 14px">Type <strong>DELETE</strong> to confirm.</p>
+            <input class="form-control" type="text" id="delete-confirm-input" placeholder="DELETE" style="max-width:200px;margin-bottom:12px" />
+            <div id="delete-account-err" style="color:var(--red,#de350b);font-size:13px;display:none;margin-bottom:10px"></div>
+            <div style="display:flex;gap:10px">
+              <button class="btn btn-danger" id="confirm-delete-btn">Delete my account</button>
+              <button class="btn btn-secondary" id="cancel-delete-btn">Cancel</button>
+            </div>
+          </div>`
+
+        document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+          area.innerHTML = '<button class="btn btn-danger" id="delete-account-btn">Delete my account</button>'
+          area.dataset.rendered = ''
+          renderAccount()
+        })
+
+        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+          const val = document.getElementById('delete-confirm-input').value.trim()
+          const err = document.getElementById('delete-account-err')
+          if (val !== 'DELETE') { err.textContent = 'Please type DELETE exactly.'; err.style.display = 'block'; return }
+          const btn = document.getElementById('confirm-delete-btn')
+          btn.disabled = true; btn.textContent = 'Deleting…'
+          try {
+            const res  = await fetch('/api/auth/account', { method: 'DELETE', credentials: 'same-origin' })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error)
+            window.location.href = '/login.html?deleted=1'
+          } catch (e) { err.textContent = e.message; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Delete my account' }
+        })
+      })
+    }
+
+    // ── Email / SMTP settings (admin only) ────────────────────────
+    async function renderEmail() {
+      const area = document.getElementById('email-config-area')
+      if (!area || area.dataset.rendered) return
+      area.dataset.rendered = '1'
+
+      if (me?.role !== 'admin') {
+        area.style.display = 'none'
+        document.getElementById('email-admin-only-notice').style.display = ''
+        return
+      }
+
+      let cfg
+      try { cfg = await GET('/config/email') } catch { return }
+
+      // Populate fields
+      document.getElementById('smtp-host').value      = cfg.smtpHost
+      document.getElementById('smtp-port').value      = cfg.smtpPort || '587'
+      document.getElementById('smtp-secure').checked  = cfg.smtpSecure
+      document.getElementById('smtp-user').value      = cfg.smtpUser
+      document.getElementById('smtp-pass').value      = cfg.hasPassword ? '••••••••' : ''
+      document.getElementById('smtp-from-name').value = cfg.smtpFromName
+      document.getElementById('smtp-from-addr').value = cfg.smtpFromAddr
+
+      const allowToggle = document.getElementById('allow-signup-toggle')
+      const allowLabel  = document.getElementById('allow-signup-label')
+      allowToggle.checked = cfg.allowSignup
+      allowLabel.textContent = cfg.allowSignup ? 'Enabled' : 'Disabled'
+
+      // Show connection status
+      const statusBar = document.getElementById('smtp-status-bar')
+      if (cfg.enabled) {
+        statusBar.style.cssText = 'display:flex;padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:16px;align-items:center;gap:8px;background:rgba(0,135,90,.08);border:1px solid rgba(0,135,90,.25);color:var(--text-1)'
+        statusBar.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="var(--green)" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> SMTP configured — password reset and invite emails are active.'
+      } else {
+        statusBar.style.cssText = 'display:flex;padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:16px;align-items:center;gap:8px;background:var(--gray-50);border:1px solid var(--border-2);color:var(--text-2)'
+        statusBar.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> No SMTP configured. Password reset links are shown on screen instead of emailed.'
+      }
+
+      // Password show/hide
+      document.getElementById('smtp-pw-toggle').addEventListener('click', () => {
+        const inp = document.getElementById('smtp-pass')
+        if (inp.value === '••••••••') { inp.value = ''; inp.type = 'text'; return }
+        inp.type = inp.type === 'text' ? 'password' : 'text'
+      })
+
+      // Allow signup toggle
+      allowToggle.addEventListener('change', async () => {
+        allowLabel.textContent = allowToggle.checked ? 'Enabled' : 'Disabled'
+        try {
+          await PATCH('/config/email', { allowSignup: allowToggle.checked })
+          toast(`Open signup ${allowToggle.checked ? 'enabled' : 'disabled'}`, 'success')
+        } catch (err) { toast(err.message, 'error') }
+      })
+
+      // Save SMTP
+      document.getElementById('save-smtp-btn').addEventListener('click', async () => {
+        const saveBtn = document.getElementById('save-smtp-btn')
+        const msg     = document.getElementById('smtp-save-msg')
+        saveBtn.disabled = true; saveBtn.textContent = 'Saving…'
+        const pass = document.getElementById('smtp-pass').value
+        try {
+          await PATCH('/config/email', {
+            smtpHost:     document.getElementById('smtp-host').value.trim(),
+            smtpPort:     document.getElementById('smtp-port').value,
+            smtpSecure:   document.getElementById('smtp-secure').checked,
+            smtpUser:     document.getElementById('smtp-user').value.trim(),
+            smtpPass:     pass === '••••••••' ? undefined : pass,
+            smtpFromName: document.getElementById('smtp-from-name').value.trim(),
+            smtpFromAddr: document.getElementById('smtp-from-addr').value.trim(),
+          })
+          msg.style.cssText = 'display:block;margin-top:10px;font-size:13px;color:var(--green)'
+          msg.textContent = '✓ SMTP configuration saved.'
+          setTimeout(() => msg.style.display = 'none', 3000)
+          area.dataset.rendered = ''   // force re-render to refresh status bar
+        } catch (err) {
+          msg.style.cssText = 'display:block;margin-top:10px;font-size:13px;color:var(--red,#de350b)'
+          msg.textContent = err.message
+        }
+        saveBtn.disabled = false; saveBtn.textContent = 'Save'
+      })
+
+      // Test SMTP
+      document.getElementById('test-smtp-btn').addEventListener('click', async () => {
+        const testBtn = document.getElementById('test-smtp-btn')
+        const msg     = document.getElementById('smtp-save-msg')
+        testBtn.disabled = true; testBtn.textContent = 'Sending…'
+        try {
+          const data = await POST('/config/email/test', {})
+          msg.style.cssText = 'display:block;margin-top:10px;font-size:13px;color:var(--green)'
+          msg.textContent = `✓ Test email sent to ${data.sentTo}.`
+        } catch (err) {
+          msg.style.cssText = 'display:block;margin-top:10px;font-size:13px;color:var(--red,#de350b)'
+          msg.textContent = `✗ ${err.message}`
+        }
+        testBtn.disabled = false; testBtn.textContent = 'Send Test Email'
+        setTimeout(() => msg.style.display = 'none', 5000)
+      })
+
+      // Clear SMTP
+      document.getElementById('clear-smtp-btn').addEventListener('click', async () => {
+        if (!confirm('Clear all SMTP configuration? Password reset emails will stop working.')) return
+        await PATCH('/config/email', { smtpHost: '', smtpUser: '', smtpPass: '', smtpFromName: '', smtpFromAddr: '' })
+        area.dataset.rendered = ''
+        renderEmail()
+        toast('SMTP configuration cleared', 'success')
+      })
+    }
 
     // ── HTTPS / Cookie Secure toggle (admin only) ───────────────────
     async function renderHTTPS() {

@@ -87,6 +87,24 @@
     }
     function hideError() { errorEl.classList.add('hidden') }
 
+    // Show account deleted message if redirected from delete flow
+    if (new URLSearchParams(location.search).get('deleted') === '1') {
+      const banner = document.createElement('div')
+      banner.className = 'auth-error'
+      banner.style.cssText = 'background:rgba(0,135,90,.08);border-color:rgba(0,135,90,.3);color:var(--green)'
+      banner.textContent = '✓ Your account has been permanently deleted.'
+      document.getElementById('login-form').prepend(banner)
+    }
+
+    // Hide signup tab if registration is closed
+    fetch('/api/config', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(cfg => {
+        if (cfg.allowSignup === false) {
+          document.querySelector('.auth-tabs')?.remove()
+        }
+      }).catch(() => {})
+
     form.addEventListener('submit', async e => {
       e.preventDefault()
       hideError()

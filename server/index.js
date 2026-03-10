@@ -63,11 +63,12 @@ const express      = require('express')
 const cookieParser = require('cookie-parser')
 const rateLimit    = require('express-rate-limit')
 const { requireAuth, optionalAuth } = require('./middleware/auth')
+const email = require('./email')
 
 const app = express()
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
-app.use(express.json())
+app.use(express.json({ limit: '5mb' }))
 app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
 
@@ -107,6 +108,8 @@ app.get('/api/config', optionalAuth, (req, res) => {
     user:         req.user || null,
     cookieSecure: process.env.COOKIE_SECURE === 'true',
     trustProxy:   (overrides.TRUST_PROXY ?? process.env.TRUST_PROXY) === 'true',
+    allowSignup:  (overrides.ALLOW_SIGNUP ?? 'true') !== 'false',
+    smtpEnabled:  email.getSmtpConfig().enabled,
   })
 })
 
@@ -153,6 +156,63 @@ app.get('/issue.html',         requireAuth, (req, res) => res.sendFile(path.join
 app.get('/profile.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/profile.html')))
 app.get('/settings.html',      requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/settings.html')))
 app.get('/reports.html',       requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/reports.html')))
+
+// ── GET /api/config/email — read SMTP config (admin only, password masked) ────
+app.get('/api/config/email', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const o = loadOverrides()
+  res.json({
+    smtpHost:     o.SMTP_HOST      || '',
+    smtpPort:     o.SMTP_PORT      || '587',
+    smtpSecure:   o.SMTP_SECURE    === 'true',
+    smtpUser:     o.SMTP_USER      || '',
+    smtpPass:     o.SMTP_PASS      ? '••••••••' : '',
+    smtpFromName: o.SMTP_FROM_NAME || '',
+    smtpFromAddr: o.SMTP_FROM_ADDR || '',
+    hasPassword:  !!(o.SMTP_PASS),
+    enabled:      !!(o.SMTP_HOST && o.SMTP_USER),
+    allowSignup:  (o.ALLOW_SIGNUP ?? 'true') !== 'false',
+  })
+})
+
+// ── PATCH /api/config/email — save SMTP config ────────────────────────────────
+app.patch('/api/config/email', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const o = loadOverrides()
+  const { smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, smtpFromName, smtpFromAddr, allowSignup } = req.body
+
+  if (smtpHost     !== undefined) o.SMTP_HOST      = smtpHost.trim()
+  if (smtpPort     !== undefined) o.SMTP_PORT      = String(smtpPort)
+  if (smtpSecure   !== undefined) o.SMTP_SECURE    = smtpSecure ? 'true' : 'false'
+  if (smtpUser     !== undefined) o.SMTP_USER      = smtpUser.trim()
+  if (smtpFromName !== undefined) o.SMTP_FROM_NAME = smtpFromName.trim()
+  if (smtpFromAddr !== undefined) o.SMTP_FROM_ADDR = smtpFromAddr.trim()
+  // Only overwrite password if a real value (not the masked placeholder) is provided
+  if (smtpPass !== undefined && smtpPass !== '••••••••' && smtpPass !== '') o.SMTP_PASS = smtpPass
+  if (smtpPass === '' ) delete o.SMTP_PASS   // allow clearing the password
+  if (allowSignup  !== undefined) o.ALLOW_SIGNUP = allowSignup ? 'true' : 'false'
+
+  saveOverrides(o)
+  res.json({ ok: true, enabled: !!(o.SMTP_HOST && o.SMTP_USER) })
+})
+
+// ── POST /api/config/email/test — send a test email ──────────────────────────
+app.post('/api/config/email/test', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const result = await email.testConnection()
+  if (!result.ok) return res.status(400).json({ error: result.error })
+  // Send a real test email to the logged-in admin
+  const { rows: [me] } = await require('./db/connection').query(
+    'SELECT name, email FROM users WHERE id = $1', [req.user.id]
+  )
+  await email.sendMail({
+    to: me.email,
+    subject: 'ForgeTrack SMTP test — it works!',
+    html: `<p>Hi ${me.name},</p><p>Your ForgeTrack SMTP configuration is working correctly.</p>`,
+    text: `Hi ${me.name}, your ForgeTrack SMTP configuration is working correctly.`,
+  })
+  res.json({ ok: true, sentTo: me.email })
+})
 
 // ── 404 handler ────────────────────────────────────────────────────────────────
 app.use((req, res) => {
