@@ -77,6 +77,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
   (async () => {
+    injectShell()
+    await initTopbar()
+    document.title = 'Settings — ForgeTrack'
+
+    const [config, users, projects, issues] = await Promise.all([GET('/config'), GET('/users'), GET('/projects'), GET('/issues')])
+    const me      = config.user
+    const isAdmin = me?.role === 'admin'
+
     const ALL_TABS = [
       { id:'appearance',    label:'Appearance',    adminOnly: false, icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
       { id:'team',          label:'Team',          adminOnly: false, icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
@@ -86,12 +94,7 @@
       { id:'account',       label:'Account',       adminOnly: false, icon:'<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
       { id:'build',         label:'Build Info',    adminOnly: false, icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
     ]
-    const isAdmin = me?.role === 'admin'
     const TABS = ALL_TABS.filter(t => !t.adminOnly || isAdmin)
-
-    injectShell()
-    await initTopbar()
-    document.title = 'Settings — ForgeTrack'
 
     // Inject tab bar as a sibling of page-content so it doesn't scroll
     const appBody = document.querySelector('.app-body')
@@ -114,8 +117,6 @@
     }
 
     const content = document.getElementById('page-content')
-    const [config, users, projects, issues] = await Promise.all([GET('/config'), GET('/users'), GET('/projects'), GET('/issues')])
-    const me = config.user
     const v = config.version || '0.0.1'
     const isDev = v.includes('-dev.'), isRC = v.includes('-rc')
     const base = v.split('-')[0]
