@@ -98,6 +98,8 @@ router.post('/login', async (req, res) => {
     if (!rows.length) return res.status(401).json({ error: 'No account found with this email address.' })
 
     const user = rows[0]
+    if (user.is_active === false)
+      return res.status(403).json({ error: 'This account has been deactivated. Contact an admin.' })
     if (!await bcrypt.compare(password, user.password))
       return res.status(401).json({ error: 'Incorrect password.' })
 

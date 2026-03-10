@@ -14,7 +14,6 @@
       background: var(--surface);
       border-bottom: 1px solid var(--border-2);
     }
-    /* Tab bar — horizontal scroll on mobile */
     .settings-tabs {
       display: flex; gap: 0; overflow-x: auto; scrollbar-width: none;
       padding: 0 16px;
@@ -31,6 +30,19 @@
     .settings-tab:hover { color: var(--text); }
     .settings-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
     .settings-tab svg { width: 14px; height: 14px; flex-shrink: 0; }
+    /* Mobile: replace tab bar with a select dropdown */
+    .settings-mobile-select {
+      display: none;
+      width: calc(100% - 32px);
+      margin: 10px 16px;
+      padding: 9px 12px;
+      background: var(--gray-50);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-md);
+      font-family: var(--font); font-size: 14px; font-weight: 500;
+      color: var(--text); cursor: pointer;
+      appearance: auto;
+    }
     .settings-panel { display: none; padding: 24px; max-width: 720px; }
     .settings-panel.active { display: block; }
     .section-card { margin-bottom: 20px; }
@@ -38,8 +50,9 @@
     .info-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-2); }
     .info-table td:first-child { color: var(--text-2); width: 160px; }
     .info-table tr:last-child td { border-bottom: none; }
-    .member-row { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-2); }
+    .member-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-2); }
     .member-row:last-child { border-bottom: none; }
+    .member-actions { display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
     .theme-options { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
     .theme-option {
       display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -62,10 +75,18 @@
     .twofa-disabled { color: var(--text-3); }
     .qr-wrap { text-align:center; padding:16px; background:var(--gray-50); border:1px solid var(--border-2); border-radius:var(--r-lg); margin-bottom:16px; }
     .qr-wrap canvas { display:inline-block; }
+    /* Modal overlay for set-password */
+    .modal-overlay { position:fixed;inset:0;background:rgba(9,30,66,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px; }
+    .modal-box { background:var(--surface);border-radius:var(--r-xl);padding:24px;width:100%;max-width:400px;box-shadow:0 24px 80px rgba(9,30,66,.3); }
+    .modal-title { font-size:16px;font-weight:700;margin-bottom:4px; }
+    .modal-sub { font-size:13px;color:var(--text-2);margin-bottom:18px; }
     @media (max-width: 600px) {
-      .settings-tab { padding: 10px 12px; font-size: 12px; }
+      .settings-tabs { display: none; }
+      .settings-mobile-select { display: block; }
       .settings-panel { padding: 16px; }
       .info-table td:first-child { width: 120px; }
+      .member-actions { gap: 4px; }
+      .member-actions .btn { padding: 5px 8px; font-size: 11px; }
     }
   </style>
 </head>
@@ -108,7 +129,10 @@
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">${t.icon}</svg>
             ${t.label}
           </button>`).join('')}
-      </div>`
+      </div>
+      <select class="settings-mobile-select" id="settings-mobile-select">
+        ${TABS.map((t,i) => `<option value="${t.id}"${i===0?' selected':''}>${t.label}</option>`).join('')}
+      </select>`
     // Insert tab bar between topbar and page-content (wrapping app-body contents)
     if (appBody && pageContent) {
       // Restructure: app-body → [tab-bar + page-content vertically]
@@ -154,7 +178,7 @@
 
       <!-- Team -->
       <div class="settings-panel" id="panel-team">
-        ${me?.role === 'admin' ? `
+        ${isAdmin ? `
         <div class="card section-card">
           <h3 class="section-title">Invite Member</h3>
           <p class="text-2 text-sm" style="margin-bottom:16px">Create an account for a new team member. ${config.smtpEnabled ? 'An invitation email will be sent with their login details.' : 'SMTP is not configured — the temporary password will be shown here for you to share manually.'}</p>
@@ -184,16 +208,26 @@
             ${config.allowSignup ? `<span class="text-3 text-sm">Open signup: <a href="/signup.html" style="color:var(--brand)">/signup.html</a></span>` : `<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">Signup disabled</span>`}
           </div>
           ${users.map(u => `
-            <div class="member-row">
+            <div class="member-row" id="member-row-${u.id}">
               ${avatarHtml(u, 36)}
               <div style="flex:1;min-width:0">
                 <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                   ${esc(u.name)}
                   ${u.id === me?.id ? `<span class="role-badge">you</span>` : ''}
+                  ${!u.is_active ? `<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">inactive</span>` : ''}
                 </div>
                 <div class="text-3 text-sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.email)}</div>
               </div>
               <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:var(--gray-100);color:var(--text-2);flex-shrink:0">${esc(u.role)}</span>
+              ${isAdmin && u.id !== me?.id ? `
+              <div class="member-actions">
+                <button class="btn btn-sm" onclick="setPasswordModal('${u.id}','${esc(u.name)}')">Set Password</button>
+                ${u.is_active
+                  ? `<button class="btn btn-sm" style="color:var(--orange)" onclick="toggleActive('${u.id}', false)">Deactivate</button>`
+                  : `<button class="btn btn-sm" style="color:var(--green)" onclick="toggleActive('${u.id}', true)">Reactivate</button>`
+                }
+                <button class="btn btn-sm" style="color:var(--red,#de350b)" onclick="deleteUser('${u.id}','${esc(u.name)}')">Delete</button>
+              </div>` : ''}
             </div>`).join('')}
         </div>
       </div>
@@ -393,6 +427,8 @@
     function switchTab(id) {
       tabBar.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.panel === id))
       document.querySelectorAll('.settings-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + id))
+      const sel = document.getElementById('settings-mobile-select')
+      if (sel) sel.value = id
       history.replaceState(null, '', '#' + id)
       if (id === 'security')      { renderHTTPS(); renderTwoFA() }
       if (id === 'notifications') { renderNotifications() }
@@ -400,6 +436,74 @@
       if (id === 'email')         { renderEmail() }
       if (id === 'team')          { wireInvite() }
     }
+
+    // ── Admin: toggle active / delete / set password (Team tab) ──────────────
+    async function toggleActive(userId, activate) {
+      const row = document.getElementById('member-row-' + userId)
+      try {
+        const res = await PATCH('/users/' + userId, { is_active: activate })
+        if (!res.ok) return alert(res.error || 'Failed to update account.')
+        // Reload the team tab to reflect changes
+        const freshUsers = await GET('/users')
+        const membersCard = document.querySelector('#panel-team .section-card:last-child')
+        if (membersCard) {
+          membersCard.querySelector('.member-row') && location.reload()
+        }
+        location.reload()
+      } catch { alert('Something went wrong.') }
+    }
+
+    async function deleteUser(userId, name) {
+      if (!confirm(`Permanently delete ${name}? This cannot be undone. Their issues will be unassigned.`)) return
+      try {
+        const res = await DELETE('/users/' + userId)
+        if (!res.ok) return alert(res.error || 'Failed to delete user.')
+        document.getElementById('member-row-' + userId)?.remove()
+      } catch { alert('Something went wrong.') }
+    }
+
+    function setPasswordModal(userId, name) {
+      const existing = document.getElementById('set-pw-modal')
+      if (existing) existing.remove()
+      const modal = document.createElement('div')
+      modal.className = 'modal-overlay'
+      modal.id = 'set-pw-modal'
+      modal.innerHTML = `
+        <div class="modal-box">
+          <div class="modal-title">Set Password</div>
+          <div class="modal-sub">Set a new password for <strong>${esc(name)}</strong>. They should change it on next login.</div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">New password</label>
+            <input class="form-control" id="set-pw-input" type="password" placeholder="Min. 6 characters" autocomplete="new-password" />
+          </div>
+          <div id="set-pw-error" style="display:none;color:var(--red,#de350b);font-size:13px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn" id="set-pw-cancel">Cancel</button>
+            <button class="btn btn-primary" id="set-pw-confirm">Set Password</button>
+          </div>
+        </div>`
+      document.body.appendChild(modal)
+      document.getElementById('set-pw-input').focus()
+      document.getElementById('set-pw-cancel').addEventListener('click', () => modal.remove())
+      modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+      document.getElementById('set-pw-confirm').addEventListener('click', async () => {
+        const pw = document.getElementById('set-pw-input').value
+        const errEl = document.getElementById('set-pw-error')
+        if (pw.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = ''; return }
+        errEl.style.display = 'none'
+        document.getElementById('set-pw-confirm').disabled = true
+        try {
+          const res = await POST('/users/' + userId + '/set-password', { password: pw })
+          if (!res.ok) { errEl.textContent = res.error || 'Failed to set password.'; errEl.style.display = ''; document.getElementById('set-pw-confirm').disabled = false; return }
+          modal.remove()
+        } catch { errEl.textContent = 'Something went wrong.'; errEl.style.display = ''; document.getElementById('set-pw-confirm').disabled = false }
+      })
+    }
+
+    // Make admin action handlers global (called from inline onclick)
+    window.toggleActive    = toggleActive
+    window.deleteUser      = deleteUser
+    window.setPasswordModal = setPasswordModal
 
     // ── Invite member (Team tab) ───────────────────────────────────
     function wireInvite() {
@@ -434,6 +538,7 @@
       })
     }
     tabBar.querySelectorAll('.settings-tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.panel)))
+    tabBar.querySelector('#settings-mobile-select')?.addEventListener('change', e => switchTab(e.target.value))
     const hash = location.hash.replace('#', '')
     if (hash && TABS.find(t => t.id === hash)) switchTab(hash)
 

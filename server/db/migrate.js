@@ -120,6 +120,7 @@ async function migrate() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
       -- ── Password reset tokens ─────────────────────────────────────
       CREATE TABLE IF NOT EXISTS password_reset_tokens (

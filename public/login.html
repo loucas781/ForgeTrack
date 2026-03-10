@@ -26,7 +26,7 @@
 
     <div class="auth-tabs">
       <a href="/login.html"  class="auth-tab active">Sign In</a>
-      <a href="/signup.html" class="auth-tab">Create Account</a>
+      <a href="/signup.html" class="auth-tab" id="signup-tab" style="display:none">Create Account</a>
       <div class="auth-tab-indicator" style="left:0"></div>
     </div>
 
@@ -100,8 +100,13 @@
     fetch('/api/config', { credentials: 'same-origin' })
       .then(r => r.json())
       .then(cfg => {
-        if (cfg.allowSignup === false) {
-          document.querySelector('.auth-tabs')?.remove()
+        if (cfg.allowSignup !== false) {
+          // Show the tab and restore the two-tab indicator width
+          const tab = document.getElementById('signup-tab')
+          if (tab) {
+            tab.style.display = ''
+            document.querySelector('.auth-tab-indicator').style.width = '50%'
+          }
         }
       }).catch(() => {})
 
