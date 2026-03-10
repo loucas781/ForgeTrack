@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
+const { isAdmin, canManageProject, requireRole } = require('../permissions')
 
 router.use(requireAuth)
 
@@ -41,7 +42,7 @@ router.get('/', async (req, res) => {
 })
 
 // ── POST /api/projects ────────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
+router.post('/', requireRole('lead'), async (req, res) => {
   try {
     const { name, key, description, color, lead_id } = req.body
     if (!name?.trim() || !key?.trim())
@@ -81,8 +82,11 @@ router.get('/:id', async (req, res) => {
 // ── PATCH /api/projects/:id ───────────────────────────────────────────────────
 router.patch('/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT id FROM projects WHERE id = $1', [req.params.id])
+    const { rows } = await db.query('SELECT id, name, lead_id FROM projects WHERE id = $1', [req.params.id])
     if (!rows.length) return res.status(404).json({ error: 'Project not found' })
+    const proj = rows[0]
+    if (!canManageProject(req.user, proj))
+      return res.status(403).json({ error: 'Only admins or the project lead can edit this project.' })
 
     const { name, key, description, color, lead_id, archived, icon } = req.body
     const updates = {}
@@ -114,8 +118,10 @@ router.patch('/:id', async (req, res) => {
 // ── DELETE /api/projects/:id ──────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT id, name FROM projects WHERE id = $1', [req.params.id])
+    const { rows } = await db.query('SELECT id, name, lead_id FROM projects WHERE id = $1', [req.params.id])
     if (!rows.length) return res.status(404).json({ error: 'Project not found' })
+    if (!canManageProject(req.user, rows[0]))
+      return res.status(403).json({ error: 'Only admins or the project lead can delete this project.' })
     await db.query('DELETE FROM projects WHERE id = $1', [req.params.id])
     audit(req.user.id, 'project.delete', 'project', rows[0].id, rows[0].name)
     res.json({ ok: true })

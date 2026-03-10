@@ -196,6 +196,7 @@
               <label class="form-label">Role</label>
               <select class="form-control" id="invite-role">
                 <option value="member">Member</option>
+                <option value="lead">Project Lead</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -219,9 +220,10 @@
                 </div>
                 <div class="text-3 text-sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.email)}</div>
               </div>
-              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:var(--gray-100);color:var(--text-2);flex-shrink:0">${esc(u.role)}</span>
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:${u.role==='admin'?'rgba(0,82,204,.1)':u.role==='lead'?'rgba(101,84,192,.1)':'var(--gray-100)'};color:${u.role==='admin'?'var(--brand)':u.role==='lead'?'#6554c0':'var(--text-2)'};flex-shrink:0">${u.role==='lead'?'Project Lead':esc(u.role)}</span>
               ${isAdmin && u.id !== me?.id ? `
               <div class="member-actions">
+                <button class="btn btn-sm" onclick="changeRoleModal('${u.id}','${esc(u.name)}','${u.role}')">Change Role</button>
                 <button class="btn btn-sm" onclick="setPasswordModal('${u.id}','${esc(u.name)}')">Set Password</button>
                 ${u.is_active
                   ? `<button class="btn btn-sm" style="color:var(--orange)" onclick="toggleActive('${u.id}', false)">Deactivate</button>`
@@ -553,9 +555,53 @@
     }
 
     // Make admin action handlers global (called from inline onclick)
-    window.toggleActive    = toggleActive
-    window.deleteUser      = deleteUser
+    window.toggleActive     = toggleActive
+    window.deleteUser       = deleteUser
     window.setPasswordModal = setPasswordModal
+    window.changeRoleModal  = changeRoleModal
+
+    function changeRoleModal(userId, name, currentRole) {
+      const existing = document.getElementById('change-role-modal')
+      if (existing) existing.remove()
+      const ROLE_LABELS = { member: 'Member', lead: 'Project Lead', admin: 'Admin' }
+      const modal = document.createElement('div')
+      modal.className = 'modal-overlay'
+      modal.id = 'change-role-modal'
+      modal.innerHTML = `
+        <div class="modal-box">
+          <div class="modal-title">Change Role</div>
+          <div class="modal-sub">Set a new role for <strong>${esc(name)}</strong>.</div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Role</label>
+            <select class="form-control" id="change-role-select">
+              <option value="member"${currentRole==='member'?' selected':''}>Member — can view projects, create &amp; comment on issues</option>
+              <option value="lead"${currentRole==='lead'?' selected':''}>Project Lead — can create projects and manage issues in projects they lead</option>
+              <option value="admin"${currentRole==='admin'?' selected':''}>Admin — full access to everything</option>
+            </select>
+          </div>
+          <div id="change-role-error" style="display:none;color:var(--red,#de350b);font-size:13px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn" id="change-role-cancel">Cancel</button>
+            <button class="btn btn-primary" id="change-role-confirm">Save</button>
+          </div>
+        </div>`
+      document.body.appendChild(modal)
+      document.getElementById('change-role-cancel').addEventListener('click', () => modal.remove())
+      modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+      document.getElementById('change-role-confirm').addEventListener('click', async () => {
+        const newRole = document.getElementById('change-role-select').value
+        const errEl   = document.getElementById('change-role-error')
+        if (newRole === currentRole) { modal.remove(); return }
+        errEl.style.display = 'none'
+        document.getElementById('change-role-confirm').disabled = true
+        try {
+          const res = await PATCH('/users/' + userId, { role: newRole })
+          if (!res.ok) { errEl.textContent = res.error || 'Failed to change role.'; errEl.style.display = ''; document.getElementById('change-role-confirm').disabled = false; return }
+          modal.remove()
+          location.reload()
+        } catch { errEl.textContent = 'Something went wrong.'; errEl.style.display = ''; document.getElementById('change-role-confirm').disabled = false }
+      })
+    }
 
     // ── Invite member (Team tab) ───────────────────────────────────
     function wireInvite() {
@@ -1103,7 +1149,9 @@
             <tbody>
               ${data.entries.map(e => {
                 const meta = e.meta ? (() => { try { return JSON.parse(e.meta) } catch { return {} } })() : {}
-                const detail = meta.changed ? `Changed: ${meta.changed.join(', ')}` : meta.from && meta.to ? `${meta.from} → ${meta.to}` : meta.preview ? meta.preview : ''
+                const ROLE_DISPLAY = { member: 'Member', lead: 'Project Lead', admin: 'Admin' }
+                const fmtRole = r => ROLE_DISPLAY[r] || r
+                const detail = meta.changed ? `Changed: ${meta.changed.join(', ')}` : meta.from && meta.to ? `${fmtRole(meta.from)} → ${fmtRole(meta.to)}` : meta.preview ? meta.preview : ''
                 const actor  = { name: e.actor_name, initials: e.actor_initials, color: e.actor_color }
                 return `<tr style="border-bottom:1px solid var(--border-2)">
                   <td style="padding:8px 10px;white-space:nowrap;color:var(--text-3)">${fmtRelative(e.created_at)}</td>

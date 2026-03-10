@@ -30,6 +30,30 @@ async function loadConfig() {
   return APP_CONFIG
 }
 
+// Role rank helper — mirrors server/permissions.js
+const ROLE_RANK = { member: 0, lead: 1, admin: 2 }
+function userRank(role) { return ROLE_RANK[role] ?? 0 }
+
+/**
+ * Check if the current logged-in user has at least the given role.
+ * userCan('lead') → true for leads and admins
+ * userCan('admin') → true only for admins
+ */
+function userCan(minRole) {
+  return userRank(APP_CONFIG?.user?.role) >= userRank(minRole)
+}
+
+/**
+ * True if the current user can manage a given project object (has lead_id).
+ * Mirrors server canManageProject().
+ */
+function userCanManageProject(proj) {
+  if (!APP_CONFIG?.user) return false
+  if (APP_CONFIG.user.role === 'admin') return true
+  if (APP_CONFIG.user.role === 'lead' && proj?.lead_id === APP_CONFIG.user.id) return true
+  return false
+}
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 function toast(msg, type = '') {
   const el = document.createElement('div')
