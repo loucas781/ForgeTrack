@@ -3,6 +3,7 @@ const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
+const audit  = require('../audit')
 
 router.use(requireAuth)
 
@@ -44,10 +45,12 @@ router.get('/', async (req, res) => {
       SELECT i.*,
         a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color,
         r.name as reporter_name, r.initials as reporter_initials,
+        p.name as project_name,
         (SELECT COUNT(*)::int FROM comments c WHERE c.issue_id = i.id) as comment_count
       FROM issues i
       LEFT JOIN users a ON a.id = i.assignee_id
       LEFT JOIN users r ON r.id = i.reporter_id
+      LEFT JOIN projects p ON p.id = i.project_id
       WHERE TRUE
     `
     const params = []
@@ -124,7 +127,9 @@ router.post('/', async (req, res) => {
       )
     }
 
-    res.status(201).json(await getIssue(id))
+    const created = await getIssue(id)
+    audit(req.user.id, 'issue.create', 'issue', id, `${issueKey}: ${title.trim()}`)
+    res.status(201).json(created)
   } catch (err) {
     console.error('issue create:', err.message)
     res.status(500).json({ error: 'Server error' })
@@ -176,7 +181,14 @@ router.patch('/:id', async (req, res) => {
       )
     }
 
-    res.json(await getIssue(req.params.id))
+    const updated = await getIssue(req.params.id)
+    const changedFields = Object.keys(updates).filter(k => k !== 'updated_at')
+    if (changedFields.length || Array.isArray(req.body.labels)) {
+      audit(req.user.id, 'issue.update', 'issue', req.params.id,
+        `${updated.key}: ${updated.title}`,
+        changedFields.length ? { changed: changedFields } : { changed: ['labels'] })
+    }
+    res.json(updated)
   } catch (err) {
     console.error('issue update:', err.message)
     res.status(500).json({ error: 'Server error' })
@@ -186,9 +198,11 @@ router.patch('/:id', async (req, res) => {
 // ── DELETE /api/issues/:id ────────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT id FROM issues WHERE id = $1', [req.params.id])
+    const { rows } = await db.query('SELECT id, key, title FROM issues WHERE id = $1', [req.params.id])
     if (!rows.length) return res.status(404).json({ error: 'Issue not found' })
+    const issue = rows[0]
     await db.query('DELETE FROM issues WHERE id = $1', [req.params.id])
+    audit(req.user.id, 'issue.delete', 'issue', issue.id, `${issue.key}: ${issue.title}`)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
@@ -215,6 +229,7 @@ router.post('/:id/comments', async (req, res) => {
       SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color
       FROM comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.id = $1
     `, [id])
+    audit(req.user.id, 'comment.create', 'issue', req.params.id, null, { preview: body.trim().slice(0, 80) })
     res.status(201).json(comment)
   } catch (err) {
     console.error('comment create:', err.message)
@@ -234,6 +249,7 @@ router.delete('/:id/comments/:cid', async (req, res) => {
     if (comment.author_id !== req.user.id && req.user.role !== 'admin')
       return res.status(403).json({ error: "Cannot delete another user's comment." })
     await db.query('DELETE FROM comments WHERE id = $1', [req.params.cid])
+    audit(req.user.id, 'comment.delete', 'issue', req.params.id, null, { preview: comment.body.slice(0, 80) })
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })

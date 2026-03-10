@@ -136,6 +136,43 @@ app.patch('/api/config', requireAuth, (req, res) => {
   })
 })
 
+// ── GET /api/audit — admin: paginated audit log ───────────────────────────────
+app.get('/api/audit', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  try {
+    const limit  = Math.min(parseInt(req.query.limit  || '50'), 200)
+    const offset = parseInt(req.query.offset || '0')
+    const action = req.query.action || null
+    const actor  = req.query.actor  || null
+
+    let sql = `
+      SELECT a.*, u.name as actor_name, u.initials as actor_initials, u.color as actor_color
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.actor_id
+      WHERE TRUE
+    `
+    const params = []
+    let p = 1
+    if (action) { sql += ` AND a.action = $${p++}`; params.push(action) }
+    if (actor)  { sql += ` AND a.actor_id = $${p++}`; params.push(actor) }
+    sql += ` ORDER BY a.created_at DESC LIMIT $${p++} OFFSET $${p++}`
+    params.push(limit, offset)
+
+    const db = require('./db/connection')
+    const { rows } = await db.query(sql, params)
+    const { rows: [{ total }] } = await db.query(
+      'SELECT COUNT(*)::int as total FROM audit_log a WHERE TRUE' +
+      (action ? ` AND a.action = $1` : '') +
+      (actor  ? ` AND a.actor_id = $${action ? 2 : 1}` : ''),
+      [action, actor].filter(Boolean)
+    )
+    res.json({ entries: rows, total, limit, offset })
+  } catch (err) {
+    console.error('audit log:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 // ── API Routes ─────────────────────────────────────────────────────────────────
 app.use('/api/auth',     require('./routes/auth'))
 app.use('/api/projects', require('./routes/projects'))

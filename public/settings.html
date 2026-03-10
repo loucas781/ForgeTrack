@@ -114,6 +114,7 @@
       { id:'notifications', label:'Notifications', adminOnly: false, icon:'<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>' },
       { id:'account',       label:'Account',       adminOnly: false, icon:'<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
       { id:'build',         label:'Build Info',    adminOnly: false, icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+      { id:'audit',         label:'Audit Log',     adminOnly: true,  icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>' },
     ]
     const TABS = ALL_TABS.filter(t => !t.adminOnly || isAdmin)
 
@@ -421,7 +422,57 @@
             <tr><td>Runtime</td><td>Node.js</td></tr>
           </table>
         </div>
-      </div>`
+      </div>
+
+      ${isAdmin ? `
+      <!-- Audit Log -->
+      <div class="settings-panel" id="panel-audit">
+        <div class="card section-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+            <div>
+              <h3 class="section-title" style="margin:0">Audit Log</h3>
+              <p class="text-2 text-sm" style="margin:4px 0 0">All actions performed across the application by all users.</p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <select class="form-control" id="audit-filter-action" style="width:auto;font-size:12px;height:32px;padding:0 8px">
+                <option value="">All actions</option>
+                <option value="user.login">Login</option>
+                <option value="user.signup">Signup</option>
+                <option value="user.profile_update">Profile update</option>
+                <option value="user.activate">Activate user</option>
+                <option value="user.deactivate">Deactivate user</option>
+                <option value="user.role_change">Role change</option>
+                <option value="user.set_password">Set password</option>
+                <option value="user.delete">Delete user</option>
+                <option value="issue.create">Create issue</option>
+                <option value="issue.update">Update issue</option>
+                <option value="issue.delete">Delete issue</option>
+                <option value="comment.create">Post comment</option>
+                <option value="comment.delete">Delete comment</option>
+                <option value="project.create">Create project</option>
+                <option value="project.update">Update project</option>
+                <option value="project.delete">Delete project</option>
+              </select>
+              <select class="form-control" id="audit-filter-actor" style="width:auto;font-size:12px;height:32px;padding:0 8px">
+                <option value="">All users</option>
+                ${users.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('')}
+              </select>
+              <button class="btn btn-secondary btn-sm" id="audit-refresh-btn" style="height:32px">Refresh</button>
+            </div>
+          </div>
+          <div id="audit-table-wrap">
+            <div style="text-align:center;padding:40px;color:var(--text-3);font-size:13px">Loading audit log…</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px" id="audit-pagination">
+            <span id="audit-count" class="text-3 text-sm"></span>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" id="audit-prev" disabled>← Prev</button>
+              <button class="btn btn-secondary btn-sm" id="audit-next" disabled>Next →</button>
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
+      `
 
     // ── Tab switching ──────────────────────────────────────────────
     function switchTab(id) {
@@ -435,6 +486,7 @@
       if (id === 'account')       { renderAccount() }
       if (id === 'email')         { renderEmail() }
       if (id === 'team')          { wireInvite() }
+      if (id === 'audit')         { renderAudit() }
     }
 
     // ── Admin: toggle active / delete / set password (Team tab) ──────────────
@@ -980,6 +1032,107 @@
         }
       } catch { area.innerHTML = `<p class="text-2 text-sm">Could not load 2FA status.</p>` }
     }
+
+    // ── Audit Log panel ────────────────────────────────────────────
+    const ACTION_LABELS = {
+      'user.login':          '🔑 Login',
+      'user.signup':         '🆕 Signup',
+      'user.profile_update': '✏️ Profile update',
+      'user.activate':       '✅ Activated user',
+      'user.deactivate':     '🚫 Deactivated user',
+      'user.role_change':    '🔄 Role changed',
+      'user.set_password':   '🔒 Password set',
+      'user.delete':         '🗑 User deleted',
+      'issue.create':        '➕ Issue created',
+      'issue.update':        '✏️ Issue updated',
+      'issue.delete':        '🗑 Issue deleted',
+      'comment.create':      '💬 Comment posted',
+      'comment.delete':      '🗑 Comment deleted',
+      'project.create':      '📁 Project created',
+      'project.update':      '✏️ Project updated',
+      'project.delete':      '🗑 Project deleted',
+    }
+
+    let auditOffset = 0
+    const AUDIT_PAGE = 50
+
+    async function renderAudit() {
+      const wrap    = document.getElementById('audit-table-wrap')
+      const countEl = document.getElementById('audit-count')
+      const prevBtn = document.getElementById('audit-prev')
+      const nextBtn = document.getElementById('audit-next')
+      if (!wrap) return
+
+      // Wire filters and pagination once
+      if (!document.getElementById('audit-filter-action')?.dataset.wired) {
+        const wireFilter = () => { auditOffset = 0; renderAudit() }
+        document.getElementById('audit-filter-action')?.addEventListener('change', wireFilter)
+        document.getElementById('audit-filter-actor')?.addEventListener('change', wireFilter)
+        document.getElementById('audit-refresh-btn')?.addEventListener('click', wireFilter)
+        document.getElementById('audit-prev')?.addEventListener('click', () => { auditOffset = Math.max(0, auditOffset - AUDIT_PAGE); renderAudit() })
+        document.getElementById('audit-next')?.addEventListener('click', () => { auditOffset += AUDIT_PAGE; renderAudit() })
+        document.getElementById('audit-filter-action').dataset.wired = '1'
+      }
+
+      const action = document.getElementById('audit-filter-action')?.value || ''
+      const actor  = document.getElementById('audit-filter-actor')?.value  || ''
+      const qs     = new URLSearchParams({ limit: AUDIT_PAGE, offset: auditOffset, ...(action && {action}), ...(actor && {actor}) })
+
+      wrap.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-3);font-size:13px">Loading…</div>`
+      try {
+        const data = await GET('/audit?' + qs)
+        if (!data.entries.length) {
+          wrap.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-3);font-size:13px">No audit entries found.</div>`
+          if (countEl) countEl.textContent = '0 entries'
+          if (prevBtn) prevBtn.disabled = true
+          if (nextBtn) nextBtn.disabled = true
+          return
+        }
+
+        wrap.innerHTML = `
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border-2)">
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600;white-space:nowrap">Time</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600">User</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600">Action</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600">Subject</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.entries.map(e => {
+                const meta = e.meta ? (() => { try { return JSON.parse(e.meta) } catch { return {} } })() : {}
+                const detail = meta.changed ? `Changed: ${meta.changed.join(', ')}` : meta.from && meta.to ? `${meta.from} → ${meta.to}` : meta.preview ? meta.preview : ''
+                const actor  = { name: e.actor_name, initials: e.actor_initials, color: e.actor_color }
+                return `<tr style="border-bottom:1px solid var(--border-2)">
+                  <td style="padding:8px 10px;white-space:nowrap;color:var(--text-3)">${fmtRelative(e.created_at)}</td>
+                  <td style="padding:8px 10px;white-space:nowrap">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      ${avatarHtml(actor, 20)}
+                      <span style="font-weight:500">${esc(e.actor_name || 'System')}</span>
+                    </div>
+                  </td>
+                  <td style="padding:8px 10px;white-space:nowrap">${ACTION_LABELS[e.action] || esc(e.action)}</td>
+                  <td style="padding:8px 10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.entity_name||'')}">
+                    ${esc(e.entity_name || e.entity_id || '—')}
+                  </td>
+                  <td style="padding:8px 10px;color:var(--text-2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(detail)}">
+                    ${esc(detail || '—')}
+                  </td>
+                </tr>`
+              }).join('')}
+            </tbody>
+          </table>`
+
+        if (countEl) countEl.textContent = `${data.total} total entries · showing ${auditOffset + 1}–${Math.min(auditOffset + AUDIT_PAGE, data.total)}`
+        if (prevBtn) prevBtn.disabled = auditOffset === 0
+        if (nextBtn) nextBtn.disabled = auditOffset + AUDIT_PAGE >= data.total
+      } catch (err) {
+        wrap.innerHTML = `<p class="text-2 text-sm" style="color:var(--red)">Failed to load audit log: ${esc(err.message)}</p>`
+      }
+    }
+
   })()
   </script>
 </body>

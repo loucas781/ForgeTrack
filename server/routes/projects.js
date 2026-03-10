@@ -3,6 +3,7 @@ const router = require('express').Router()
 const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
+const audit  = require('../audit')
 
 router.use(requireAuth)
 
@@ -57,7 +58,9 @@ router.post('/', async (req, res) => {
       [id, keyUpper, name.trim(), description?.trim() || null, color || '#0052cc', lead_id || req.user.id]
     )
     await db.query('INSERT INTO issue_counters (project_id, counter) VALUES ($1, 0)', [id])
-    res.status(201).json(await getProject(id))
+    const created = await getProject(id)
+    audit(req.user.id, 'project.create', 'project', id, name.trim())
+    res.status(201).json(created)
   } catch (err) {
     console.error('project create:', err.message)
     res.status(500).json({ error: 'Server error' })
@@ -81,7 +84,7 @@ router.patch('/:id', async (req, res) => {
     const { rows } = await db.query('SELECT id FROM projects WHERE id = $1', [req.params.id])
     if (!rows.length) return res.status(404).json({ error: 'Project not found' })
 
-    const { name, key, description, color, lead_id, archived } = req.body
+    const { name, key, description, color, lead_id, archived, icon } = req.body
     const updates = {}
     if (name !== undefined)        updates.name        = name.trim()
     if (key !== undefined)         updates.key         = key.trim().toUpperCase()
@@ -89,6 +92,7 @@ router.patch('/:id', async (req, res) => {
     if (color !== undefined)       updates.color       = color
     if (lead_id !== undefined)     updates.lead_id     = lead_id
     if (archived !== undefined)    updates.archived    = Boolean(archived)
+    if (icon !== undefined)        updates.icon        = icon || null
 
     if (Object.keys(updates).length) {
       const keys = Object.keys(updates)
@@ -98,7 +102,9 @@ router.patch('/:id', async (req, res) => {
         [...Object.values(updates), req.params.id]
       )
     }
-    res.json(await getProject(req.params.id))
+    const updated = await getProject(req.params.id)
+    audit(req.user.id, 'project.update', 'project', req.params.id, updated.name, { changed: Object.keys(updates) })
+    res.json(updated)
   } catch (err) {
     console.error('project update:', err.message)
     res.status(500).json({ error: 'Server error' })
@@ -108,9 +114,10 @@ router.patch('/:id', async (req, res) => {
 // ── DELETE /api/projects/:id ──────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT id FROM projects WHERE id = $1', [req.params.id])
+    const { rows } = await db.query('SELECT id, name FROM projects WHERE id = $1', [req.params.id])
     if (!rows.length) return res.status(404).json({ error: 'Project not found' })
     await db.query('DELETE FROM projects WHERE id = $1', [req.params.id])
+    audit(req.user.id, 'project.delete', 'project', rows[0].id, rows[0].name)
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })

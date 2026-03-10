@@ -3,6 +3,7 @@ const router  = require('express').Router()
 const db      = require('../db/connection')
 const bcrypt  = require('bcryptjs')
 const { requireAuth } = require('../middleware/auth')
+const audit   = require('../audit')
 
 router.use(requireAuth)
 
@@ -24,7 +25,7 @@ router.patch('/:id', async (req, res) => {
   const { id } = req.params
   const { is_active, role } = req.body
   try {
-    const { rows: [target] } = await db.query('SELECT id, role, is_active FROM users WHERE id = $1', [id])
+    const { rows: [target] } = await db.query('SELECT id, name, role, is_active FROM users WHERE id = $1', [id])
     if (!target) return res.status(404).json({ error: 'User not found' })
     if (id === req.user.id) return res.status(400).json({ error: 'You cannot modify your own account status here.' })
 
@@ -45,6 +46,10 @@ router.patch('/:id', async (req, res) => {
       `UPDATE users SET ${updates.join(', ')} WHERE id = $${vals.length} RETURNING id, name, email, role, is_active`,
       vals
     )
+    if (is_active !== undefined)
+      audit(req.user.id, is_active ? 'user.activate' : 'user.deactivate', 'user', id, target.name)
+    if (role !== undefined)
+      audit(req.user.id, 'user.role_change', 'user', id, target.name, { from: target.role, to: role })
     res.json({ ok: true, user })
   } catch (err) {
     console.error('user patch:', err.message)
@@ -58,10 +63,11 @@ router.post('/:id/set-password', async (req, res) => {
   const { password } = req.body
   if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' })
   try {
-    const { rows: [target] } = await db.query('SELECT id FROM users WHERE id = $1', [req.params.id])
+    const { rows: [target] } = await db.query('SELECT id, name FROM users WHERE id = $1', [req.params.id])
     if (!target) return res.status(404).json({ error: 'User not found' })
     const hash = await bcrypt.hash(password, 12)
     await db.query('UPDATE users SET password = $1 WHERE id = $2', [hash, req.params.id])
+    audit(req.user.id, 'user.set_password', 'user', req.params.id, target.name)
     res.json({ ok: true })
   } catch (err) {
     console.error('set password:', err.message)
@@ -75,7 +81,7 @@ router.delete('/:id', async (req, res) => {
   const { id } = req.params
   if (id === req.user.id) return res.status(400).json({ error: 'Use Account settings to delete your own account.' })
   try {
-    const { rows: [target] } = await db.query('SELECT id, role FROM users WHERE id = $1', [id])
+    const { rows: [target] } = await db.query('SELECT id, name, role FROM users WHERE id = $1', [id])
     if (!target) return res.status(404).json({ error: 'User not found' })
     if (target.role === 'admin') {
       const { rows: admins } = await db.query("SELECT id FROM users WHERE role = 'admin' AND id != $1", [id])
@@ -83,6 +89,7 @@ router.delete('/:id', async (req, res) => {
     }
     await db.query('UPDATE issues SET assignee_id = NULL WHERE assignee_id = $1', [id])
     await db.query('DELETE FROM users WHERE id = $1', [id])
+    audit(req.user.id, 'user.delete', 'user', id, target.name)
     res.json({ ok: true })
   } catch (err) {
     console.error('delete user:', err.message)

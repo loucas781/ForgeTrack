@@ -210,6 +210,7 @@
     const users = await GET('/users')
     let selectedColor = project.color
     let confirmingDelete = false
+    let projectIconDataUrl = null
 
     content.innerHTML = `
       <div class="page-pad" style="max-width:860px">
@@ -243,7 +244,23 @@
               <textarea class="form-control" id="ps-desc" rows="3">${esc(project.description||'')}</textarea>
             </div>
             <div class="form-group">
-              <label class="form-label">Project Colour</label>
+              <label class="form-label">Project Icon <span class="text-3" style="font-weight:400">(optional — overrides the colour initial)</span></label>
+              <div style="display:flex;align-items:center;gap:14px">
+                <div id="ps-icon-preview" style="cursor:pointer;position:relative;flex-shrink:0" title="Click to upload a project icon">
+                  ${projectIcon(project, 48)}
+                  <div style="position:absolute;inset:0;border-radius:4px;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 200ms" id="ps-icon-overlay">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  </div>
+                  <input type="file" id="ps-icon-input" accept="image/*" style="display:none" />
+                </div>
+                <div>
+                  <div class="text-2 text-sm" id="ps-icon-hint">Click the icon to upload an image</div>
+                  ${project.icon ? `<button type="button" class="btn btn-ghost btn-sm" id="ps-icon-remove" style="margin-top:4px;color:var(--red)">Remove photo</button>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Project Colour <span class="text-3" style="font-weight:400">(used as fallback when no icon is set)</span></label>
               <div class="color-picker" id="ps-colors"></div>
             </div>
             <div style="display:flex;align-items:center;gap:12px">
@@ -271,16 +288,59 @@
     })
     renderColorPicker(document.getElementById('ps-colors'), PROJECT_COLORS, selectedColor, v => { selectedColor = v })
 
+    // Project icon upload
+    const iconPreview = document.getElementById('ps-icon-preview')
+    const iconInput   = document.getElementById('ps-icon-input')
+    const iconOverlay = document.getElementById('ps-icon-overlay')
+    if (iconPreview && iconInput) {
+      iconPreview.addEventListener('mouseenter', () => { if (iconOverlay) iconOverlay.style.opacity = '1' })
+      iconPreview.addEventListener('mouseleave', () => { if (iconOverlay) iconOverlay.style.opacity = '0' })
+      iconPreview.addEventListener('click', () => iconInput.click())
+      iconInput.addEventListener('change', e => {
+        const file = e.target.files[0]
+        if (!file) return
+        if (file.size > 2 * 1024 * 1024) { toast('Image must be under 2MB', 'error'); return }
+        const reader = new FileReader()
+        reader.onload = ev => {
+          projectIconDataUrl = ev.target.result
+          iconPreview.innerHTML = `
+            <img src="${projectIconDataUrl}" style="width:48px;height:48px;border-radius:4px;object-fit:cover;display:block" />
+            <div style="position:absolute;inset:0;border-radius:4px;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 200ms" id="ps-icon-overlay">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
+            <input type="file" id="ps-icon-input" accept="image/*" style="display:none" />`
+          // Re-wire overlay hover since innerHTML was replaced
+          const newOverlay = iconPreview.querySelector('#ps-icon-overlay')
+          iconPreview.addEventListener('mouseenter', () => { if (newOverlay) newOverlay.style.opacity = '1' })
+          iconPreview.addEventListener('mouseleave', () => { if (newOverlay) newOverlay.style.opacity = '0' })
+          const newInput = iconPreview.querySelector('#ps-icon-input')
+          if (newInput) newInput.addEventListener('change', iconInput.onchange)
+          const hint = document.getElementById('ps-icon-hint')
+          if (hint) hint.textContent = 'Icon selected — click Save to apply'
+        }
+        reader.readAsDataURL(file)
+      })
+    }
+    document.getElementById('ps-icon-remove')?.addEventListener('click', () => {
+      projectIconDataUrl = ''  // empty string = clear
+      iconPreview.innerHTML = projectIcon({ key: project.key, color: project.color, icon: null }, 48)
+      const hint = document.getElementById('ps-icon-hint')
+      if (hint) hint.textContent = 'Icon removed — click Save to apply'
+    })
+
     document.getElementById('project-settings-form').addEventListener('submit', async e => {
       e.preventDefault()
       try {
-        await PATCH('/projects/' + project.id, {
+        const body = {
           name:        document.getElementById('ps-name').value.trim(),
           key:         document.getElementById('ps-key').value.trim(),
           description: document.getElementById('ps-desc').value.trim(),
           color:       selectedColor,
           lead_id:     document.getElementById('ps-lead').value || null,
-        })
+        }
+        if (projectIconDataUrl !== null) body.icon = projectIconDataUrl || null
+        await PATCH('/projects/' + project.id, body)
+        projectIconDataUrl = null
         const saved = document.getElementById('ps-saved')
         saved.style.display = 'inline'
         setTimeout(() => saved.style.display = 'none', 2500)

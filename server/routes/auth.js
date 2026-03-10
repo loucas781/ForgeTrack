@@ -9,6 +9,7 @@ const { requireAuth } = require('../middleware/auth')
 const emailSvc = require('../email')
 const fs       = require('fs')
 const path     = require('path')
+const audit    = require('../audit')
 
 function loadOverrides() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../.runtime-overrides.json'), 'utf8')) } catch { return {} }
@@ -80,6 +81,7 @@ router.post('/signup', async (req, res) => {
     emailSvc.sendWelcome({ to: norm, name: name.trim(), loginUrl: origin + '/login.html' }).catch(() => {})
 
     res.cookie('token', makeToken(user), cookieOpts())
+    audit(user.id, 'user.signup', 'user', user.id, user.name)
     res.json({ ok: true, user })
   } catch (err) {
     console.error('signup:', err.message)
@@ -105,6 +107,7 @@ router.post('/login', async (req, res) => {
 
     const { password: _, ...pub } = user
     res.cookie('token', makeToken(pub), cookieOpts())
+    audit(pub.id, 'user.login', 'user', pub.id, pub.name)
     res.json({ ok: true, user: pub })
   } catch (err) {
     console.error('login:', err.message)
@@ -172,6 +175,8 @@ router.patch('/profile', requireAuth, async (req, res) => {
     const { rows: [updated] } = await db.query(
       'SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = $1', [user.id]
     )
+    audit(user.id, 'user.profile_update', 'user', user.id, updated.name,
+      { changed: Object.keys(updates).filter(k => k !== 'password') })
     res.cookie('token', makeToken(updated), cookieOpts())
     res.json({ ok: true, user: updated })
   } catch (err) {

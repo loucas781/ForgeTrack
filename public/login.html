@@ -59,7 +59,7 @@
         Sign In
       </button>
 
-      <p class="auth-switch">Don't have an account? <a href="/signup.html">Create one</a></p>
+      <p class="auth-switch" style="display:none">Don't have an account? <a href="/signup.html">Create one</a></p>
     </form>
   </div>
 
@@ -100,13 +100,20 @@
     fetch('/api/config', { credentials: 'same-origin' })
       .then(r => r.json())
       .then(cfg => {
-        if (cfg.allowSignup !== false) {
+        const signupAllowed = cfg.allowSignup !== false
+        const tab           = document.getElementById('signup-tab')
+        const indicator     = document.querySelector('.auth-tab-indicator')
+        const switchEl      = document.querySelector('.auth-switch')
+        if (signupAllowed) {
           // Show the tab and restore the two-tab indicator width
-          const tab = document.getElementById('signup-tab')
-          if (tab) {
-            tab.style.display = ''
-            document.querySelector('.auth-tab-indicator').style.width = '50%'
-          }
+          if (tab)       { tab.style.display = ''; }
+          if (indicator) { indicator.style.width = '50%' }
+          if (switchEl)  { switchEl.style.display = '' }
+        } else {
+          // Keep tab hidden, stretch indicator to full width, hide "Create one" link
+          if (tab)       { tab.style.display = 'none' }
+          if (indicator) { indicator.style.width = '100%' }
+          if (switchEl)  { switchEl.style.display = 'none' }
         }
       }).catch(() => {})
 
