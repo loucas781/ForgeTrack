@@ -38,8 +38,9 @@ jobs:
     runs-on: ubuntu-latest
 
     # For pull_request: only run when the PR was actually merged (not just closed)
+    # For push to develop: skip if this is our own version bump commit
     if: |
-      github.event_name == 'push' ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')) ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
@@ -73,6 +74,19 @@ jobs:
         run: |
           BRANCH="${{ steps.branch.outputs.name }}"
           CURRENT=$(cat .version | tr -d '[:space:]')
+
+          # Debug output
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Branch: $BRANCH"
+          echo "Current version in .version: $CURRENT"
+          echo "Event: ${{ github.event_name }}"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "PR merged: ${{ github.event.pull_request.merged }}"
+            echo "Source branch: ${{ github.event.pull_request.head.ref }}"
+          fi
+          echo "Latest commits:"
+          git log --oneline -3
+          echo "═══════════════════════════════════════════════════════════"
 
           # Strip any pre-release suffix to get clean base semver x.y.z
           BASE=$(echo "$CURRENT" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
@@ -117,7 +131,7 @@ jobs:
         run: |
           git add .version package.json
           git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
+          git commit -m "[skip ci] chore: bump version to ${{ steps.bump.outputs.new_version }}"
           git push origin HEAD:${{ steps.branch.outputs.name }}
 
       - name: Create or replace Git tag
