@@ -105,6 +105,7 @@
     document.title = 'Settings — ForgeTrack'
 
     const [config, users, projects, issues] = await Promise.all([GET('/config'), GET('/users'), GET('/projects'), GET('/issues')])
+    if (typeof APP_CONFIG !== 'undefined') Object.assign(APP_CONFIG, config)
     const me      = config.user
     const isAdmin = me?.role === 'admin'
 
@@ -116,6 +117,7 @@
       { id:'notifications', label:'Notifications', adminOnly: false, icon:'<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>' },
       { id:'account',       label:'Account',       adminOnly: false, icon:'<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
       { id:'build',         label:'Build Info',    adminOnly: false, icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+      { id:'about',         label:'About',         adminOnly: false, icon:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
       { id:'audit',         label:'Audit Log',     adminOnly: true,  icon:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>' },
     ]
     const TABS = ALL_TABS.filter(t => !t.adminOnly || isAdmin)
@@ -136,7 +138,7 @@
       <select class="settings-mobile-select" id="settings-mobile-select">
         ${TABS.map((t,i) => `<option value="${t.id}"${i===0?' selected':''}>${t.label}</option>`).join('')}
       </select>`
-    // Insert tab bar between topbar and page-content (wrapping app-body contents)
+    // Insert tab bar between sidebar and page-content in app-body
     if (appBody && pageContent) {
       // Restructure: app-body → [tab-bar + page-content vertically]
       appBody.style.flexDirection = 'column'
@@ -432,6 +434,72 @@
         </div>
       </div>
 
+      <!-- About -->
+      <div class="settings-panel" id="panel-about">
+        <div class="card section-card">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+            <div style="flex-shrink:0;width:52px;height:52px;border-radius:10px;background:#0052cc;display:flex;align-items:center;justify-content:center">
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+                <path d="M9 22L15 9l3 5-3 3 7 5H9z" fill="white" opacity="0.9"/>
+                <path d="M15 9l7 13H15l-3-5 3-3V9z" fill="white" opacity="0.55"/>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:20px;font-weight:700;letter-spacing:-.02em">ForgeTrack</div>
+              <div class="text-2 text-sm">Self-hosted issue tracker · <span class="mono">${esc(v)}</span></div>
+            </div>
+          </div>
+          <p class="text-2" style="font-size:13px;line-height:1.6;margin-bottom:0">
+            ForgeTrack is a lightweight, fully self-hosted issue tracker built on vanilla HTML/CSS/JS
+            with a Node.js/Express backend and PostgreSQL database. Designed to be deployed on
+            Proxmox LXC containers with automated CI/CD via GitHub Actions.
+          </p>
+        </div>
+
+        <div class="card section-card">
+          <h3 class="section-title">Project Links</h3>
+          <table class="info-table">
+            <tr>
+              <td>Source code</td>
+              <td><a href="https://github.com/loucas781/ForgeTrack" target="_blank" rel="noopener" style="color:var(--brand)">github.com/loucas781/ForgeTrack</a></td>
+            </tr>
+            <tr>
+              <td>Issues &amp; bug reports</td>
+              <td><a href="https://github.com/loucas781/ForgeTrack/issues" target="_blank" rel="noopener" style="color:var(--brand)">GitHub Issues</a></td>
+            </tr>
+            <tr>
+              <td>Releases</td>
+              <td><a href="https://github.com/loucas781/ForgeTrack/releases" target="_blank" rel="noopener" style="color:var(--brand)">GitHub Releases</a></td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="card section-card">
+          <h3 class="section-title">Tech Stack</h3>
+          <table class="info-table">
+            <tr><td>Frontend</td><td>Vanilla HTML / CSS / JavaScript</td></tr>
+            <tr><td>Backend</td><td>Node.js · Express</td></tr>
+            <tr><td>Database</td><td>PostgreSQL</td></tr>
+            <tr><td>Auth</td><td>JWT (HttpOnly cookie) · bcrypt + pepper · TOTP 2FA</td></tr>
+            <tr><td>Deployment</td><td>Proxmox LXC (Ubuntu 24)</td></tr>
+            <tr><td>CI/CD</td><td>GitHub Actions</td></tr>
+          </table>
+        </div>
+
+        <div class="card section-card">
+          <h3 class="section-title">Legal</h3>
+          <table class="info-table">
+            <tr><td>Copyright</td><td>© ${new Date().getFullYear()} ForgeTrack. All rights reserved.</td></tr>
+            <tr><td>License</td><td><a href="https://github.com/loucas781/ForgeTrack/blob/main/LICENSE" target="_blank" rel="noopener" style="color:var(--brand)">View license on GitHub</a></td></tr>
+          </table>
+          <p class="text-3" style="font-size:12px;margin-top:16px;line-height:1.6">
+            ForgeTrack is provided as-is. By using this software you agree to the terms set out in the
+            project license. This instance is self-hosted and independently operated — Anthropic and any
+            other third parties have no access to data stored here.
+          </p>
+        </div>
+      </div>
+
       ${isAdmin ? `
       <!-- Audit Log -->
       <div class="settings-panel" id="panel-audit">
@@ -525,6 +593,8 @@
     function setPasswordModal(userId, name) {
       const existing = document.getElementById('set-pw-modal')
       if (existing) existing.remove()
+      const policy = getPolicy()
+      const minLen = policy.minLength || 12
       const modal = document.createElement('div')
       modal.className = 'modal-overlay'
       modal.id = 'set-pw-modal'
@@ -534,7 +604,7 @@
           <div class="modal-sub">Set a new password for <strong>${esc(name)}</strong>. They should change it on next login.</div>
           <div class="form-group" style="margin-bottom:12px">
             <label class="form-label">New password</label>
-            <input class="form-control" id="set-pw-input" type="password" placeholder="Min. 6 characters" autocomplete="new-password" />
+            <input class="form-control" id="set-pw-input" type="password" placeholder="At least ${minLen} characters" autocomplete="new-password" />
           </div>
           <div id="set-pw-error" style="display:none;color:var(--red,#de350b);font-size:13px;margin-bottom:10px"></div>
           <div style="display:flex;gap:8px;justify-content:flex-end">

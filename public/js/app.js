@@ -214,7 +214,8 @@ function statusBadge(status) {
 // ─── Project key → initial letter icon ───────────────────────────────────────
 function projectIcon(project, size = 30) {
   if (project.icon) {
-    return `<img src="${esc(project.icon)}" style="width:${size}px;height:${size}px;border-radius:4px;object-fit:cover;display:inline-block;flex-shrink:0" title="${esc(project.name)}" />`
+    const src = project.icon.startsWith('data:') ? project.icon : `/uploads/${project.icon}`
+    return `<img src="${esc(src)}" style="width:${size}px;height:${size}px;border-radius:4px;object-fit:cover;display:inline-block;flex-shrink:0" title="${esc(project.name)}" />`
   }
   return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:4px;background:${project.color};color:#fff;font-weight:700;font-size:${Math.round(size*0.43)}px;flex-shrink:0">${esc((project.key||'?')[0])}</span>`
 }
@@ -390,12 +391,19 @@ async function initTopbar() {
     // Keyboard: Escape closes results
     searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchResults.classList.remove('show'); searchInput.blur() } })
   }
+
+  // Hide "New Project" from the Create menu for plain members
+  if (user?.role === 'member') {
+    document.getElementById('create-project-btn')?.remove()
+    document.getElementById('proj-menu-new')?.remove()
+  }
+
   initAttachmentPicker()
 }
 
 // ─── Issue row HTML ───────────────────────────────────────────────────────────
 function issueRowHtml(issue) {
-  const assignee = issue.assignee_id ? { name: issue.assignee_name, initials: issue.assignee_initials, color: issue.assignee_color } : null
+  const assignee = issue.assignee_id ? { name: issue.assignee_name, initials: issue.assignee_initials, color: issue.assignee_color, avatar: issue.assignee_avatar } : null
   return `
     <a class="issue-row" href="/issue.html?id=${issue.id}">
       ${typeIcon(issue.type)}

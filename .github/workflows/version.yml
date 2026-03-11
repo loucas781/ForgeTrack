@@ -7,12 +7,11 @@ name: Version
 
 on:
   # develop: bump on every push (auto-increments dev counter)
+  # Loop prevention is handled by the [skip ci] check in the job if-condition below,
+  # NOT by paths-ignore — paths-ignore would silently skip runs when .version or
+  # BUILDCOUNT are legitimately part of a commit (e.g. after restoring from a zip).
   push:
     branches: [develop]
-    paths-ignore:
-      - '.version'
-      - 'package.json'
-      - 'BUILDCOUNT'
 
   # staging + main: bump when a PR is merged INTO them
   pull_request:
@@ -38,8 +37,9 @@ jobs:
     runs-on: ubuntu-latest
 
     # For pull_request: only run when the PR was actually merged (not just closed)
+    # For push to develop: skip if this is our own version bump commit
     if: |
-      github.event_name == 'push' ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')) ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
@@ -72,7 +72,33 @@ jobs:
         id: bump
         run: |
           BRANCH="${{ steps.branch.outputs.name }}"
-          CURRENT=$(cat .version | tr -d '[:space:]')
+
+          # For staging/main: read the version from the SOURCE branch (the one being
+          # merged in) so version numbers stay in sync across all three branches.
+          # For develop: read from the current branch as normal.
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            SOURCE_BRANCH="${{ github.event.pull_request.head.ref }}"
+            CURRENT=$(git show origin/${SOURCE_BRANCH}:.version 2>/dev/null | tr -d '[:space:]' || cat .version | tr -d '[:space:]')
+          else
+            CURRENT=$(cat .version | tr -d '[:space:]')
+          fi
+
+          # Debug output
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Branch: $BRANCH"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Source branch: $SOURCE_BRANCH"
+            echo "Version read from source: $CURRENT"
+          else
+            echo "Current version in .version: $CURRENT"
+          fi
+          echo "Event: ${{ github.event_name }}"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "PR merged: ${{ github.event.pull_request.merged }}"
+          fi
+          echo "Latest commits:"
+          git log --oneline -3
+          echo "═══════════════════════════════════════════════════════════"
 
           # Strip any pre-release suffix to get clean base semver x.y.z
           BASE=$(echo "$CURRENT" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
@@ -92,8 +118,14 @@ jobs:
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
 
           elif [[ "$BRANCH" == "develop" ]]; then
-            # Dev: total commit count as the build number
-            DEV_NUM=$(git rev-list --count HEAD)
+            # Dev: extract current build number from .version and increment by 1.
+            # This is simple, predictable, and always goes up by exactly 1 per push.
+            if echo "$CURRENT" | grep -q '\-dev\.'; then
+              LAST_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
+            else
+              LAST_NUM=0
+            fi
+            DEV_NUM=$(( LAST_NUM + 1 ))
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_NUM}"
           fi
 
@@ -117,12 +149,15 @@ jobs:
         run: |
           git add .version package.json
           git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
+          git commit -m "[skip ci] chore: bump version to ${{ steps.bump.outputs.new_version }}"
           git push origin HEAD:${{ steps.branch.outputs.name }}
 
       - name: Create or replace Git tag
         run: |
           TAG="${{ steps.bump.outputs.tag }}"
+          # Fetch all tags so we have an accurate local picture before deleting
+          git fetch --tags --force 2>/dev/null || true
+          # Delete locally and remotely if the tag already exists (e.g. re-run)
           git tag -d "$TAG" 2>/dev/null || true
           git push origin ":refs/tags/$TAG" 2>/dev/null || true
           git tag -a "$TAG" -m "Release ${{ steps.bump.outputs.new_version }} from ${{ steps.branch.outputs.name }}"

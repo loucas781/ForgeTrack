@@ -4,15 +4,15 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
-const { canEditIssue, canDeleteComment } = require('../permissions')
+const { canEditIssue, canEditOwnIssue, canEditIssueMeta, canUpdateIssueStatus, canDeleteComment } = require('../permissions')
 
 router.use(requireAuth)
 
 async function getIssue(id) {
   const { rows } = await db.query(`
     SELECT i.*,
-      a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color,
-      r.name as reporter_name, r.initials as reporter_initials, r.color as reporter_color
+      a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color, a.avatar as assignee_avatar,
+      r.name as reporter_name, r.initials as reporter_initials, r.color as reporter_color, r.avatar as reporter_avatar
     FROM issues i
     LEFT JOIN users a ON a.id = i.assignee_id
     LEFT JOIN users r ON r.id = i.reporter_id
@@ -25,7 +25,7 @@ async function getIssue(id) {
     'SELECT label FROM issue_labels WHERE issue_id = $1 ORDER BY label', [id]
   )
   const { rows: comments } = await db.query(`
-    SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color
+    SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color, u.avatar as author_avatar
     FROM comments c
     LEFT JOIN users u ON u.id = c.author_id
     WHERE c.issue_id = $1
@@ -44,8 +44,8 @@ router.get('/', async (req, res) => {
 
     let sql = `
       SELECT i.*,
-        a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color,
-        r.name as reporter_name, r.initials as reporter_initials,
+        a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color, a.avatar as assignee_avatar,
+        r.name as reporter_name, r.initials as reporter_initials, r.color as reporter_color, r.avatar as reporter_avatar,
         p.name as project_name,
         (SELECT COUNT(*)::int FROM comments c WHERE c.issue_id = i.id) as comment_count
       FROM issues i
@@ -158,8 +158,26 @@ router.patch('/:id', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Issue not found' })
     const issue = rows[0]
     const proj  = { id: issue.project_id, lead_id: issue.lead_id }
-    if (!canEditIssue(req.user, proj))
-      return res.status(403).json({ error: 'Only admins or the project lead can edit issues.' })
+
+    // Determine what the request is trying to change
+    const META_FIELDS   = new Set(['priority', 'type'])
+    const STATUS_FIELDS = new Set(['status'])
+    const requestedFields = Object.keys(req.body).filter(k => req.body[k] !== undefined)
+    const isStatusOnlyUpdate = requestedFields.length > 0 && requestedFields.every(k => STATUS_FIELDS.has(k))
+    const touchesMeta    = requestedFields.some(k => META_FIELDS.has(k))
+
+    // Assignees may update status only
+    if (isStatusOnlyUpdate) {
+      if (!canUpdateIssueStatus(req.user, issue, proj))
+        return res.status(403).json({ error: 'You must be the assignee, project lead, or admin to update this issue.' })
+    } else {
+      // All other edits require being the creator, lead, or admin
+      if (!canEditOwnIssue(req.user, issue, proj))
+        return res.status(403).json({ error: 'You can only edit issues you created, or you must be the project lead or admin.' })
+      // Priority and type further restricted to leads/admins
+      if (touchesMeta && !canEditIssueMeta(req.user, proj))
+        return res.status(403).json({ error: 'Only the project lead or admin can change priority or type.' })
+    }
 
     const allowed = ['title','description','type','status','priority','assignee_id','story_points','due_date']
     const updates = {}
@@ -213,8 +231,8 @@ router.delete('/:id', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Issue not found' })
     const issue = rows[0]
     const proj  = { id: issue.project_id, lead_id: issue.lead_id }
-    if (!canEditIssue(req.user, proj))
-      return res.status(403).json({ error: 'Only admins or the project lead can delete issues.' })
+    if (!canEditOwnIssue(req.user, issue, proj))
+      return res.status(403).json({ error: 'You can only delete issues you created, or you must be the project lead or admin.' })
     await db.query('DELETE FROM issues WHERE id = $1', [req.params.id])
     audit(req.user.id, 'issue.delete', 'issue', issue.id, `${issue.key}: ${issue.title}`)
     res.json({ ok: true })
@@ -240,7 +258,7 @@ router.post('/:id/comments', async (req, res) => {
     await db.query('UPDATE issues SET updated_at = NOW() WHERE id = $1', [req.params.id])
 
     const { rows: [comment] } = await db.query(`
-      SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color
+      SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color, u.avatar as author_avatar
       FROM comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.id = $1
     `, [id])
     audit(req.user.id, 'comment.create', 'issue', req.params.id, null, { preview: body.trim().slice(0, 80) })

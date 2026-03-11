@@ -19,8 +19,10 @@ const UPLOADS_DIR = path.join(__dirname, '../uploads')
 const AVATAR_DIR  = path.join(UPLOADS_DIR, 'avatars')
 const ATTACH_DIR  = path.join(UPLOADS_DIR, 'attachments')
 
+const ICON_DIR = path.join(UPLOADS_DIR, 'icons')
+
 // Ensure dirs exist at module load
-;[UPLOADS_DIR, AVATAR_DIR, ATTACH_DIR].forEach(d => {
+;[UPLOADS_DIR, AVATAR_DIR, ATTACH_DIR, ICON_DIR].forEach(d => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true })
 })
 
@@ -142,4 +144,44 @@ function sanitiseFilename(name) {
     .slice(0, 100)
 }
 
-module.exports = { saveAvatar, deleteAvatar, saveAttachment, deleteAttachment, readFile, UPLOADS_DIR }
+/**
+ * Save a project icon. Replaces any existing icon for that project.
+ * @param {string} projectId
+ * @param {string} base64DataUrl  — "data:image/png;base64,..." or raw base64
+ * @param {string} mimeType
+ * @returns {string} relative path e.g. "icons/abc123.png"
+ */
+function saveProjectIcon(projectId, base64DataUrl, mimeType) {
+  if (!ALLOWED_MIME.has(mimeType) || !mimeType.startsWith('image/'))
+    throw new Error('Invalid image type')
+
+  const buf = decodeBase64(base64DataUrl)
+  if (buf.length > 2 * 1024 * 1024) throw new Error('Icon must be under 2MB')
+
+  const ext      = EXT_MAP[mimeType] || '.jpg'
+  const filename = `${projectId}${ext}`
+  const filepath = path.join(ICON_DIR, filename)
+
+  // Remove any existing icon for this project (different extension)
+  try {
+    const files = fs.readdirSync(ICON_DIR)
+    files.filter(f => f.startsWith(projectId + '.')).forEach(f => {
+      try { fs.unlinkSync(path.join(ICON_DIR, f)) } catch {}
+    })
+  } catch {}
+
+  fs.writeFileSync(filepath, buf)
+  return `icons/${filename}`
+}
+
+/**
+ * Delete a project icon file.
+ * @param {string} relPath  — relative path stored in DB e.g. "icons/abc.png"
+ */
+function deleteProjectIcon(relPath) {
+  if (!relPath) return
+  const abs = path.join(UPLOADS_DIR, relPath)
+  try { fs.unlinkSync(abs) } catch {}
+}
+
+module.exports = { saveAvatar, deleteAvatar, saveProjectIcon, deleteProjectIcon, saveAttachment, deleteAttachment, readFile, UPLOADS_DIR }

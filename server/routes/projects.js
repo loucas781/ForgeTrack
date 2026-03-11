@@ -5,12 +5,13 @@ const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
 const { isAdmin, canManageProject, requireRole } = require('../permissions')
+const filestore = require('../filestore')
 
 router.use(requireAuth)
 
 async function getProject(id) {
   const { rows } = await db.query(`
-    SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color,
+    SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color, u.avatar as lead_avatar,
       (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id
          AND i.status NOT IN ('done','cancelled')) as open_issues,
       (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id) as total_issues
@@ -25,7 +26,7 @@ async function getProject(id) {
 router.get('/', async (req, res) => {
   try {
     const { rows } = await db.query(`
-      SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color,
+      SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color, u.avatar as lead_avatar,
         (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id
            AND i.status NOT IN ('done','cancelled')) as open_issues,
         (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id) as total_issues
@@ -82,7 +83,7 @@ router.get('/:id', async (req, res) => {
 // ── PATCH /api/projects/:id ───────────────────────────────────────────────────
 router.patch('/:id', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT id, name, lead_id FROM projects WHERE id = $1', [req.params.id])
+    const { rows } = await db.query('SELECT id, name, lead_id, icon FROM projects WHERE id = $1', [req.params.id])
     if (!rows.length) return res.status(404).json({ error: 'Project not found' })
     const proj = rows[0]
     if (!canManageProject(req.user, proj))
@@ -96,7 +97,28 @@ router.patch('/:id', async (req, res) => {
     if (color !== undefined)       updates.color       = color
     if (lead_id !== undefined)     updates.lead_id     = lead_id
     if (archived !== undefined)    updates.archived    = Boolean(archived)
-    if (icon !== undefined)        updates.icon        = icon || null
+
+    // Icon: save to disk if a new image is provided, delete file if explicitly cleared
+    if (icon !== undefined) {
+      const oldIcon = proj.icon
+      if (icon && icon.startsWith('data:')) {
+        // New image — extract mime type from data URL and save to disk
+        const mimeMatch = icon.match(/^data:([^;]+);base64,/)
+        const mimeType  = mimeMatch ? mimeMatch[1] : 'image/png'
+        try {
+          const iconPath = filestore.saveProjectIcon(proj.id, icon, mimeType)
+          updates.icon = iconPath
+          // Clean up old icon file if it was a stored path (not a legacy base64 blob)
+          if (oldIcon && !oldIcon.startsWith('data:')) filestore.deleteProjectIcon(oldIcon)
+        } catch (err) {
+          return res.status(400).json({ error: err.message })
+        }
+      } else {
+        // Explicitly cleared (null or empty string)
+        updates.icon = null
+        if (oldIcon && !oldIcon.startsWith('data:')) filestore.deleteProjectIcon(oldIcon)
+      }
+    }
 
     if (Object.keys(updates).length) {
       const keys = Object.keys(updates)

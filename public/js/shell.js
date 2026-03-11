@@ -173,8 +173,8 @@ function buildProjectSidebarHTML(project, activePage) {
         ${links.slice(0,3).map(l => `<a href="${l.href}" class="sidebar-link${activePage===l.match?' active':''}">${svgIcon(l.icon)} ${l.label}</a>`).join('')}
         <div class="sidebar-section-label">Insights</div>
         <a href="${links[3].href}" class="sidebar-link${activePage==='reports'?' active':''}">${svgIcon('chart')} Reports</a>
-        ${userCanManageProject(project) ? `<div class="sidebar-section-label">Project</div>
-        <a href="${links[4].href}" class="sidebar-link${activePage==='settings'?' active':''}">${svgIcon('settings')} Project Settings</a>` : ''}
+        <div class="sidebar-section-label">Project</div>
+        <a href="${links[4].href}" class="sidebar-link${activePage==='settings'?' active':''}">${svgIcon('settings')} Project Settings</a>
       </nav>
     </aside>`
 }

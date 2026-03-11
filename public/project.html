@@ -27,6 +27,18 @@
 
     const canManage = userCanManageProject(project)  // admin or project lead
 
+    // Hide the Project Settings sidebar link for non-managers (lead of a different project,
+    // or plain member). Can't do this before initTopbar — APP_CONFIG.user isn't set yet.
+    if (!canManage) {
+      const settingsLink = document.querySelector('.sidebar-link[href*="view=settings"]')
+      if (settingsLink) {
+        // Remove the "Project" section label immediately before it
+        const prev = settingsLink.previousElementSibling
+        if (prev?.classList.contains('sidebar-section-label')) prev.remove()
+        settingsLink.remove()
+      }
+    }
+
     const content = document.getElementById('page-content')
     document.title = `${project.name} — ForgeTrack`
 
