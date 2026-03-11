@@ -88,29 +88,6 @@ h4 { font-size: 14px; font-weight: 600; }
 .page-content { flex: 1; overflow-y: auto; }
 #page-inner   { min-height: 0; }
 
-/* ── Footer ─────────────────────────────────────────────────────── */
-.app-footer {
-  position: sticky;
-  bottom: 0;
-  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px;
-  padding: 10px 24px;
-  border-top: 1px solid var(--border-2);
-  background: var(--bg);
-  font-size: 12px;
-  color: var(--text-3);
-  z-index: 1;
-}
-.app-footer-sep { color: var(--border); }
-.app-footer-link {
-  display: inline-flex; align-items: center; gap: 5px;
-  color: var(--text-3); text-decoration: none;
-  transition: color var(--t-fast);
-}
-.app-footer-link:hover { color: var(--brand); }
-@media (max-width: 600px) {
-  .app-footer { padding-bottom: 74px; } /* clear bottom nav */
-}
-
 /* ── Topbar ─────────────────────────────────────────────────────── */
 .topbar {
   height: var(--topbar-h); background: var(--topbar-bg);
