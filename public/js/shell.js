@@ -236,9 +236,7 @@ function injectShell(opts = {}) {
       ${topbar}
       <div class="app-body">
         ${sidebar}
-        <main class="page-content" id="${contentId}">
-          <div id="page-inner"></div>
-        </main>
+        <main class="page-content" id="${contentId}"></main>
       </div>
     </div>
     ${bottomNav}

@@ -125,7 +125,6 @@
     // Inject tab bar as a sibling of page-content so it doesn't scroll
     const appBody = document.querySelector('.app-body')
     const pageContent = document.getElementById('page-content')
-    const pageInner = document.getElementById('page-inner')
     const tabBar = document.createElement('div')
     tabBar.className = 'settings-tabs-wrap'
     tabBar.innerHTML = `
@@ -146,7 +145,7 @@
       appBody.insertBefore(tabBar, pageContent)
     }
 
-    const content = pageInner
+    const content = document.getElementById('page-content')
     const v = config.version || '0.0.1'
     const isDev = v.includes('-dev.'), isRC = v.includes('-rc')
     const base = v.split('-')[0]

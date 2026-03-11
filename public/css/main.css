@@ -86,7 +86,6 @@ h4 { font-size: 14px; font-weight: 600; }
 .app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .app-body  { display: flex; flex: 1; overflow: hidden; }
 .page-content { flex: 1; overflow-y: auto; }
-#page-inner   { min-height: 0; }
 
 /* ── Topbar ─────────────────────────────────────────────────────── */
 .topbar {

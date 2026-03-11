@@ -46,7 +46,7 @@
       // Show a proper error rather than silently redirecting
       injectShell({})
       await initTopbar()
-      document.getElementById('page-inner').innerHTML = `
+      document.getElementById('page-content').innerHTML = `
         <div class="page-pad" style="max-width:500px;text-align:center;padding-top:80px">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="var(--text-3)" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:16px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
           <h2 style="margin-bottom:8px">Issue not found</h2>
@@ -70,7 +70,7 @@
     const canChangeStatus = canManage || (me?.id && issue.assignee_id === me.id)  // also assignee
 
     document.title = `${issue.key} — ForgeTrack`
-    const content = document.getElementById('page-inner')
+    const content = document.getElementById('page-content')
 
     function render(iss) {
       const assignee = iss.assignee_id ? { name:iss.assignee_name, initials:iss.assignee_initials, color:iss.assignee_color, avatar:iss.assignee_avatar } : null

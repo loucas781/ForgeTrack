@@ -26,7 +26,7 @@
     document.title = `Reports — ${project.name}`
 
     const issues = await GET('/issues?project_id=' + pid)
-    const content = document.getElementById('page-inner')
+    const content = document.getElementById('page-content')
 
     const byStatus   = ['todo','inprogress','review','done','cancelled'].map(s => ({ key:s, label:STATUS_LABELS[s],   count: issues.filter(i=>i.status===s).length,   color: {todo:'var(--gray-400)',inprogress:'var(--brand)',review:'var(--orange)',done:'var(--green)',cancelled:'var(--gray-300)'}[s] }))
     const byPriority = ['critical','high','medium','low','trivial'].map(p =>   ({ key:p, label:PRIORITY_LABELS[p], count: issues.filter(i=>i.priority===p).length, color: {critical:'var(--p-critical)',high:'var(--p-high)',medium:'var(--p-medium)',low:'var(--p-low)',trivial:'var(--p-trivial)'}[p] }))
