@@ -50,9 +50,10 @@
     .info-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-2); }
     .info-table td:first-child { color: var(--text-2); width: 160px; }
     .info-table tr:last-child td { border-bottom: none; }
-    .member-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-2); }
+    .member-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-2); flex-wrap:wrap; }
     .member-row:last-child { border-bottom: none; }
-    .member-actions { display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+    .member-row-info { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+    .member-actions { display:flex; gap:6px; flex-wrap:wrap; width:100%; padding-top:6px; margin-left:48px; }
     .theme-options { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
     .theme-option {
       display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -85,8 +86,9 @@
       .settings-mobile-select { display: block; }
       .settings-panel { padding: 16px; }
       .info-table td:first-child { width: 120px; }
-      .member-actions { gap: 4px; }
+      .member-actions { gap: 4px; margin-left: 0; padding-top: 4px; }
       .member-actions .btn { padding: 5px 8px; font-size: 11px; }
+      .member-row-info { flex-wrap: nowrap; }
     }
   </style>
 </head>
@@ -211,20 +213,23 @@
           </div>
           ${users.map(u => `
             <div class="member-row" id="member-row-${u.id}">
-              ${avatarHtml(u, 36)}
-              <div style="flex:1;min-width:0">
-                <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  ${esc(u.name)}
-                  ${u.id === me?.id ? `<span class="role-badge">you</span>` : ''}
-                  ${!u.is_active ? `<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">inactive</span>` : ''}
+              <div class="member-row-info">
+                ${avatarHtml(u, 36)}
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    ${esc(u.name)}
+                    ${u.id === me?.id ? `<span class="role-badge">you</span>` : ''}
+                    ${!u.is_active ? `<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">inactive</span>` : ''}
+                  </div>
+                  <div class="text-3 text-sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.email)}</div>
                 </div>
-                <div class="text-3 text-sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(u.email)}</div>
+                <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:${u.role==='admin'?'rgba(0,82,204,.1)':u.role==='lead'?'rgba(101,84,192,.1)':'var(--gray-100)'};color:${u.role==='admin'?'var(--brand)':u.role==='lead'?'#6554c0':'var(--text-2)'};flex-shrink:0;white-space:nowrap">${u.role==='lead'?'Project Lead':esc(u.role)}</span>
               </div>
-              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:${u.role==='admin'?'rgba(0,82,204,.1)':u.role==='lead'?'rgba(101,84,192,.1)':'var(--gray-100)'};color:${u.role==='admin'?'var(--brand)':u.role==='lead'?'#6554c0':'var(--text-2)'};flex-shrink:0">${u.role==='lead'?'Project Lead':esc(u.role)}</span>
               ${isAdmin && u.id !== me?.id ? `
               <div class="member-actions">
                 <button class="btn btn-sm" onclick="changeRoleModal('${u.id}','${esc(u.name)}','${u.role}')">Change Role</button>
                 <button class="btn btn-sm" onclick="setPasswordModal('${u.id}','${esc(u.name)}')">Set Password</button>
+                <button class="btn btn-sm" onclick="getResetLink('${u.id}','${esc(u.name)}')">Reset Link</button>
                 ${u.is_active
                   ? `<button class="btn btn-sm" style="color:var(--orange)" onclick="toggleActive('${u.id}', false)">Deactivate</button>`
                   : `<button class="btn btn-sm" style="color:var(--green)" onclick="toggleActive('${u.id}', true)">Reactivate</button>`
@@ -238,6 +243,7 @@
       <!-- Security / 2FA -->
       <div class="settings-panel" id="panel-security">
         ${isAdmin ? `<div class="card section-card" id="https-toggle-card"></div>` : ''}
+        ${isAdmin ? `<div class="card section-card" id="pw-policy-card"></div>` : ''}
         <div class="card section-card">
           <h3 class="section-title">Two-Factor Authentication (2FA)</h3>
           <p class="text-2 text-sm" style="margin-bottom:16px">
@@ -483,7 +489,7 @@
       const sel = document.getElementById('settings-mobile-select')
       if (sel) sel.value = id
       history.replaceState(null, '', '#' + id)
-      if (id === 'security')      { renderHTTPS(); renderTwoFA() }
+      if (id === 'security')      { renderHTTPS(); renderTwoFA(); if (isAdmin) renderPasswordPolicy() }
       if (id === 'notifications') { renderNotifications() }
       if (id === 'account')       { renderAccount() }
       if (id === 'email')         { renderEmail() }
@@ -537,13 +543,17 @@
           </div>
         </div>`
       document.body.appendChild(modal)
-      document.getElementById('set-pw-input').focus()
+      const setPwInput = document.getElementById('set-pw-input')
+      setPwInput.focus()
+      const setPwIndicator = createPasswordIndicator()
+      setPwInput.parentElement.after(setPwIndicator)
+      setPwInput.addEventListener('input', () => updatePasswordIndicator(setPwIndicator, setPwInput.value))
       document.getElementById('set-pw-cancel').addEventListener('click', () => modal.remove())
       modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
       document.getElementById('set-pw-confirm').addEventListener('click', async () => {
         const pw = document.getElementById('set-pw-input').value
         const errEl = document.getElementById('set-pw-error')
-        if (pw.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = ''; return }
+        const modalPv = validatePassword(pw); if (!modalPv.ok) { errEl.textContent = modalPv.errors.join(' '); errEl.style.display = ''; return }
         errEl.style.display = 'none'
         document.getElementById('set-pw-confirm').disabled = true
         try {
@@ -559,6 +569,43 @@
     window.deleteUser       = deleteUser
     window.setPasswordModal = setPasswordModal
     window.changeRoleModal  = changeRoleModal
+    window.getResetLink     = getResetLink
+
+    async function getResetLink(userId, name) {
+      const existing = document.getElementById('reset-link-modal')
+      if (existing) existing.remove()
+      const modal = document.createElement('div')
+      modal.className = 'modal-overlay'
+      modal.id = 'reset-link-modal'
+      modal.innerHTML = `
+        <div class="modal-box">
+          <div class="modal-title">Password Reset Link</div>
+          <div class="modal-sub">Generating a secure reset link for <strong>${esc(name)}</strong>. The link expires in <strong>15 minutes</strong>.</div>
+          <div id="reset-link-result" style="margin:14px 0;font-size:13px;color:var(--text-2)">Loading…</div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn" id="reset-link-close">Close</button>
+            <button class="btn btn-primary" id="reset-link-copy" style="display:none">Copy Link</button>
+          </div>
+        </div>`
+      document.body.appendChild(modal)
+      modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+      document.getElementById('reset-link-close').addEventListener('click', () => modal.remove())
+      try {
+        const res = await GET('/auth/admin/reset-link/' + userId)
+        if (!res.ok) throw new Error(res.error || 'Failed')
+        const resultEl = document.getElementById('reset-link-result')
+        resultEl.innerHTML = `
+          <div style="background:var(--gray-50);border:1px solid var(--border-2);border-radius:var(--r-md);padding:10px;word-break:break-all;font-family:monospace;font-size:12px;user-select:all">${esc(res.resetUrl)}</div>
+          <div style="margin-top:8px;font-size:12px;color:var(--orange)">⚠ Share this link securely. It expires in 15 minutes and can only be used once.</div>`
+        const copyBtn = document.getElementById('reset-link-copy')
+        copyBtn.style.display = ''
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(res.resetUrl).then(() => { copyBtn.textContent = 'Copied!'; setTimeout(() => copyBtn.textContent = 'Copy Link', 2000) })
+        })
+      } catch (err) {
+        document.getElementById('reset-link-result').innerHTML = `<span style="color:var(--red)">${esc(err.message)}</span>`
+      }
+    }
 
     function changeRoleModal(userId, name, currentRole) {
       const existing = document.getElementById('change-role-modal')
@@ -901,6 +948,84 @@
     }
 
     // ── HTTPS / Cookie Secure toggle (admin only) ───────────────────
+    async function renderPasswordPolicy() {
+      const card = document.getElementById('pw-policy-card')
+      if (!card) return
+      const pol = APP_CONFIG?.passwordPolicy || {}
+
+      function policyToggleRow(key, label, desc) {
+        const checked = pol[key] !== false
+        return `
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--border-1)">
+            <div>
+              <div style="font-size:14px;font-weight:500">${label}</div>
+              <div class="text-3 text-sm" style="margin-top:2px">${desc}</div>
+            </div>
+            <label style="flex-shrink:0;position:relative;display:inline-block;width:40px;height:22px;cursor:pointer">
+              <input type="checkbox" data-pol="${key}" ${checked ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute" />
+              <span class="toggle-track" style="position:absolute;inset:0;border-radius:11px;background:${checked ? 'var(--brand)' : 'var(--gray-300)'};transition:background .2s"></span>
+              <span style="position:absolute;top:3px;left:${checked ? '21px' : '3px'};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s"></span>
+            </label>
+          </div>`
+      }
+
+      card.innerHTML = `
+        <h3 class="section-title">Password Policy</h3>
+        <p class="text-2 text-sm" style="margin-bottom:16px">
+          Rules enforced when any user sets or changes their password. Changes take effect immediately — existing passwords are not affected.
+        </p>
+        <div style="margin-bottom:16px">
+          <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            Minimum length
+            <span class="text-3 text-sm">Currently: ${pol.minLength ?? 12} characters</span>
+          </label>
+          <input type="number" id="pol-minLength" min="6" max="128" value="${pol.minLength ?? 12}"
+            class="form-control" style="max-width:120px" />
+        </div>
+        <div style="margin-bottom:4px">
+          ${policyToggleRow('requireUpper',   'Uppercase letter',         'Must contain at least one A–Z character.')}
+          ${policyToggleRow('requireLower',   'Lowercase letter',         'Must contain at least one a–z character.')}
+          ${policyToggleRow('requireNumber',  'Number',                   'Must contain at least one digit 0–9.')}
+          ${policyToggleRow('requireSpecial', 'Special character',        'Must contain at least one symbol e.g. !@#$%^&*.')}
+          ${policyToggleRow('noSequential',   'No sequential characters', 'Blocks patterns like aaa, 111, abc, 123.')}
+        </div>
+        <div id="pol-status" style="min-height:20px;margin-top:12px;font-size:13px"></div>
+        <div style="margin-top:14px">
+          <button class="btn btn-primary" id="pol-save">Save Policy</button>
+        </div>`
+
+      // Wire toggles — live preview via knob movement
+      card.querySelectorAll('input[type=checkbox][data-pol]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const track = cb.nextElementSibling
+          const knob  = track.nextElementSibling
+          track.style.background = cb.checked ? 'var(--brand)' : 'var(--gray-300)'
+          knob.style.left = cb.checked ? '21px' : '3px'
+        })
+      })
+
+      document.getElementById('pol-save').addEventListener('click', async () => {
+        const body = { minLength: parseInt(document.getElementById('pol-minLength').value) }
+        card.querySelectorAll('input[type=checkbox][data-pol]').forEach(cb => {
+          body[cb.dataset.pol] = cb.checked
+        })
+        const statusEl = document.getElementById('pol-status')
+        statusEl.textContent = 'Saving…'
+        try {
+          const res = await PATCH('/config/password-policy', body)
+          if (!res.ok) throw new Error(res.error || 'Failed')
+          // Update local config so the indicator in the same session reflects changes
+          if (APP_CONFIG) APP_CONFIG.passwordPolicy = res.passwordPolicy
+          statusEl.style.color = 'var(--green)'
+          statusEl.textContent = '✓ Policy saved.'
+          setTimeout(() => statusEl.textContent = '', 3000)
+        } catch (err) {
+          statusEl.style.color = 'var(--red)'
+          statusEl.textContent = err.message
+        }
+      })
+    }
+
     async function renderHTTPS() {
       const card = document.getElementById('https-toggle-card')
       if (!card) return
@@ -1136,14 +1261,15 @@
         }
 
         wrap.innerHTML = `
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          <table style="width:100%;min-width:520px;border-collapse:collapse;font-size:12px">
             <thead>
               <tr style="border-bottom:2px solid var(--border-2)">
-                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600;white-space:nowrap">Time</th>
-                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600">User</th>
-                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600">Action</th>
-                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600">Subject</th>
-                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600">Detail</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600;white-space:nowrap;min-width:90px">Time</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600;min-width:100px">User</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600;min-width:110px">Action</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600;min-width:100px">Subject</th>
+                <th style="text-align:left;padding:8px 10px;color:var(--text-3);font-weight:600;min-width:120px">Detail</th>
               </tr>
             </thead>
             <tbody>
@@ -1162,16 +1288,17 @@
                     </div>
                   </td>
                   <td style="padding:8px 10px;white-space:nowrap">${ACTION_LABELS[e.action] || esc(e.action)}</td>
-                  <td style="padding:8px 10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.entity_name||'')}">
+                  <td style="padding:8px 10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)" title="${esc(e.entity_name||'')}">
                     ${esc(e.entity_name || e.entity_id || '—')}
                   </td>
-                  <td style="padding:8px 10px;color:var(--text-2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(detail)}">
+                  <td style="padding:8px 10px;color:var(--text-2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(detail)}">
                     ${esc(detail || '—')}
                   </td>
                 </tr>`
               }).join('')}
             </tbody>
-          </table>`
+          </table>
+          </div>`
 
         if (countEl) countEl.textContent = `${data.total} total entries · showing ${auditOffset + 1}–${Math.min(auditOffset + AUDIT_PAGE, data.total)}`
         if (prevBtn) prevBtn.disabled = auditOffset === 0

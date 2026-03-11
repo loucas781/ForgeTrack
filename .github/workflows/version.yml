@@ -6,19 +6,20 @@ name: Version
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
+  # develop: bump on every push (auto-increments dev counter)
   push:
     branches: [develop]
     paths-ignore:
       - '.version'
       - 'package.json'
+      - 'BUILDCOUNT'
 
-  # staging and main use pull_request merge trigger so the workflow always fires
-  # on merge regardless of which files changed (avoids the paths-ignore trap)
+  # staging + main: bump when a PR is merged INTO them
   pull_request:
     branches: [staging, main]
     types: [closed]
 
-  # Allow manual trigger from the Actions tab
+  # Manual trigger from the Actions tab
   workflow_dispatch:
     inputs:
       branch:
@@ -36,14 +37,14 @@ jobs:
     name: Bump version
     runs-on: ubuntu-latest
 
-    # For pull_request trigger: only run when the PR was actually merged
+    # For pull_request: only run when the PR was actually merged (not just closed)
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
     steps:
-      - name: Determine branch
+      - name: Determine target branch
         id: branch
         run: |
           if [[ "${{ github.event_name }}" == "push" ]]; then
@@ -51,10 +52,11 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "name=${{ github.event.inputs.branch }}" >> $GITHUB_OUTPUT
           else
+            # pull_request — bump the branch being merged INTO
             echo "name=${{ github.event.pull_request.base.ref }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout
+      - name: Checkout target branch
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.branch.outputs.name }}
@@ -79,29 +81,29 @@ jobs:
           PATCH=$(echo "$BASE" | cut -d. -f3)
 
           if [[ "$BRANCH" == "main" ]]; then
+            # Production release: bump minor, reset patch
             MINOR=$((MINOR + 1))
             PATCH=0
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-            TAG="v${NEW_VERSION}"
 
           elif [[ "$BRANCH" == "staging" ]]; then
-            # RC of current base — no patch bump, staging is a candidate of develop
+            # RC: bump patch so each staging build has a distinct number
+            PATCH=$((PATCH + 1))
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
-            TAG="v${NEW_VERSION}"
 
           elif [[ "$BRANCH" == "develop" ]]; then
+            # Dev: total commit count as the build number
             DEV_NUM=$(git rev-list --count HEAD)
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_NUM}"
-            TAG="v${NEW_VERSION}"
           fi
 
           echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=${TAG}"                 >> $GITHUB_OUTPUT
+          echo "tag=v${NEW_VERSION}"        >> $GITHUB_OUTPUT
           echo "branch=${BRANCH}"           >> $GITHUB_OUTPUT
           echo "$NEW_VERSION" > .version
-          echo "Bumped: ${CURRENT} → ${NEW_VERSION} (tag: ${TAG})"
+          echo "Bumped: ${CURRENT} → ${NEW_VERSION}"
 
-      - name: Sync version into package.json
+      - name: Sync base version into package.json
         run: |
           BASE=$(echo "${{ steps.bump.outputs.new_version }}" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
           node -e "
@@ -118,13 +120,13 @@ jobs:
           git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]"
           git push origin HEAD:${{ steps.branch.outputs.name }}
 
-      - name: Create Git tag
+      - name: Create or replace Git tag
         run: |
-          git tag -d "${{ steps.bump.outputs.tag }}" 2>/dev/null || true
-          git push origin ":refs/tags/${{ steps.bump.outputs.tag }}" 2>/dev/null || true
-          git tag -a "${{ steps.bump.outputs.tag }}" \
-            -m "Release ${{ steps.bump.outputs.new_version }} from ${{ steps.branch.outputs.name }}"
-          git push origin "${{ steps.bump.outputs.tag }}"
+          TAG="${{ steps.bump.outputs.tag }}"
+          git tag -d "$TAG" 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          git tag -a "$TAG" -m "Release ${{ steps.bump.outputs.new_version }} from ${{ steps.branch.outputs.name }}"
+          git push origin "$TAG"
 
       - name: Summary
         run: |
