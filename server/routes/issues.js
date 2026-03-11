@@ -276,12 +276,16 @@ router.delete('/:id/comments/:cid', async (req, res) => {
 })
 
 // ── Attachments ───────────────────────────────────────────────────────────────
+// ── Attachments ───────────────────────────────────────────────────────────────
+const filestore = require('../filestore')
+
 // GET /api/issues/:id/attachments
 router.get('/:id/attachments', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT a.id, a.filename, a.mime_type, a.created_at,
-              u.name AS uploader_name, u.initials AS uploader_initials, u.color AS uploader_color
+      `SELECT a.id, a.filename, a.mime_type, a.filepath, a.created_at,
+              u.name AS uploader_name, u.initials AS uploader_initials, u.color AS uploader_color,
+              a.uploader_id
        FROM issue_attachments a
        LEFT JOIN users u ON u.id = a.uploader_id
        WHERE a.issue_id = $1 ORDER BY a.created_at ASC`,
@@ -291,54 +295,82 @@ router.get('/:id/attachments', requireAuth, async (req, res) => {
   } catch { res.status(500).json({ error: 'Server error' }) }
 })
 
-// GET /api/issues/:id/attachments/:aid/data  — return raw base64 data for display
+// GET /api/issues/:id/attachments/:aid/data  — serve file from disk
 router.get('/:id/attachments/:aid/data', requireAuth, async (req, res) => {
   try {
     const { rows: [row] } = await db.query(
-      'SELECT filename, mime_type, data FROM issue_attachments WHERE id = $1 AND issue_id = $2',
+      'SELECT filename, mime_type, filepath, data FROM issue_attachments WHERE id = $1 AND issue_id = $2',
       [req.params.aid, req.params.id]
     )
     if (!row) return res.status(404).json({ error: 'Not found' })
-    const buf = Buffer.from(row.data.split(',')[1] || row.data, 'base64')
-    res.set('Content-Type', row.mime_type)
-    res.set('Content-Disposition', `inline; filename="${row.filename}"`)
-    res.send(buf)
+
+    // New: serve from disk
+    if (row.filepath) {
+      const buf = filestore.readFile(row.filepath)
+      if (!buf) return res.status(404).json({ error: 'File not found on disk' })
+      res.set('Content-Type', row.mime_type)
+      res.set('Content-Disposition', `inline; filename="${row.filename}"`)
+      res.set('Cache-Control', 'private, max-age=3600')
+      return res.send(buf)
+    }
+    // Legacy fallback: base64 in DB
+    if (row.data) {
+      const buf = Buffer.from(row.data.split(',')[1] || row.data, 'base64')
+      res.set('Content-Type', row.mime_type)
+      res.set('Content-Disposition', `inline; filename="${row.filename}"`)
+      return res.send(buf)
+    }
+    res.status(404).json({ error: 'No data' })
   } catch { res.status(500).json({ error: 'Server error' }) }
 })
 
 // POST /api/issues/:id/attachments
+// Any authenticated user can upload to issues (members, leads, admins)
 router.post('/:id/attachments', requireAuth, async (req, res) => {
   const { filename, mime_type, data } = req.body
   if (!filename || !mime_type || !data) return res.status(400).json({ error: 'filename, mime_type and data required' })
-  if (data.length > 6 * 1024 * 1024) return res.status(413).json({ error: 'File too large (max 4MB)' })
   try {
     const { rows: [issue] } = await db.query('SELECT id FROM issues WHERE id = $1', [req.params.id])
     if (!issue) return res.status(404).json({ error: 'Issue not found' })
+
+    // Save to disk
+    const { filepath } = filestore.saveAttachment(data, mime_type, filename)
     const id = uuidv4()
     await db.query(
-      'INSERT INTO issue_attachments (id, issue_id, uploader_id, filename, mime_type, data) VALUES ($1,$2,$3,$4,$5,$6)',
-      [id, req.params.id, req.user.id, filename, mime_type, data]
+      'INSERT INTO issue_attachments (id, issue_id, uploader_id, filename, mime_type, filepath) VALUES ($1,$2,$3,$4,$5,$6)',
+      [id, req.params.id, req.user.id, filename, mime_type, filepath]
     )
-    res.status(201).json({ id, filename, mime_type })
+    res.status(201).json({ id, filename, mime_type, filepath })
   } catch (err) {
     console.error('attachment upload:', err.message)
     if (err.message.includes('relation "issue_attachments" does not exist')) {
       return res.status(503).json({ error: 'Attachments table not yet created — run: node server/db/migrate.js' })
     }
-    res.status(500).json({ error: 'Server error' })
+    res.status(400).json({ error: err.message || 'Server error' })
   }
 })
 
 // DELETE /api/issues/:id/attachments/:aid
+// Users can delete their own uploads; leads/admins can delete any in their project
 router.delete('/:id/attachments/:aid', requireAuth, async (req, res) => {
   try {
     const { rows: [row] } = await db.query(
-      'SELECT uploader_id FROM issue_attachments WHERE id = $1 AND issue_id = $2',
+      `SELECT a.uploader_id, a.filepath,
+              p.lead_id as proj_lead_id, i.project_id
+       FROM issue_attachments a
+       JOIN issues i ON i.id = a.issue_id
+       JOIN projects p ON p.id = i.project_id
+       WHERE a.id = $1 AND a.issue_id = $2`,
       [req.params.aid, req.params.id]
     )
     if (!row) return res.status(404).json({ error: 'Not found' })
-    if (row.uploader_id !== req.user.id && req.user.role !== 'admin')
-      return res.status(403).json({ error: 'Cannot delete another user\'s attachment' })
+    const isOwn    = row.uploader_id === req.user.id
+    const isAdmin  = req.user.role === 'admin'
+    const isLead   = req.user.role === 'lead' && row.proj_lead_id === req.user.id
+    if (!isOwn && !isAdmin && !isLead)
+      return res.status(403).json({ error: "You can only delete your own attachments." })
+
+    filestore.deleteAttachment(row.filepath)
     await db.query('DELETE FROM issue_attachments WHERE id = $1', [req.params.aid])
     res.json({ ok: true })
   } catch { res.status(500).json({ error: 'Server error' }) }

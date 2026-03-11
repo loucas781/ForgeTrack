@@ -123,16 +123,37 @@ async function migrate() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS icon TEXT;
 
+      -- ── Update role CHECK to include lead ─────────────────────────────
+      ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+      ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','lead','member'));
+
       -- ── Password reset tokens ─────────────────────────────────────
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
-        id         TEXT PRIMARY KEY,
-        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        token      TEXT NOT NULL UNIQUE,
-        expires_at TIMESTAMPTZ NOT NULL,
-        used       BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token       TEXT NOT NULL UNIQUE,
+        expires_at  TIMESTAMPTZ NOT NULL,
+        used        BOOLEAN NOT NULL DEFAULT FALSE,
+        request_ip  TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token);
+      -- Add request_ip to existing installs
+      ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS request_ip TEXT;
+
+      -- ── File storage: filepath columns (replace base64) ──────────────
+      ALTER TABLE issue_attachments ADD COLUMN IF NOT EXISTS filepath TEXT;
+
+      -- ── Password reset sessions (short-lived, post-token-exchange) ────────
+      -- Stores an opaque session ID after the URL token is validated and consumed.
+      -- The frontend holds the session ID in memory only — never in the URL.
+      CREATE TABLE IF NOT EXISTS password_reset_sessions (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at  TIMESTAMPTZ NOT NULL,
+        used        BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
       -- ── Audit log ──────────────────────────────────────────────────────────
       CREATE TABLE IF NOT EXISTS audit_log (

@@ -1,7 +1,9 @@
 'use strict'
 const router  = require('express').Router()
-const bcrypt  = require('bcryptjs')
+const bcrypt  = require('bcryptjs')  // kept for direct use in edge cases
+const { hashPassword, comparePassword, getPasswordPolicy, validatePassword } = require('../auth-utils')
 const jwt     = require('jsonwebtoken')
+const crypto  = require('crypto')
 const { v4: uuidv4 } = require('uuid')
 const { authenticator } = require('otplib')
 const db      = require('../db/connection')
@@ -10,6 +12,12 @@ const emailSvc = require('../email')
 const fs       = require('fs')
 const path     = require('path')
 const audit    = require('../audit')
+
+const UPLOADS_DIR = path.join(__dirname, '../../uploads')
+
+function hashToken(raw) {
+  return crypto.createHash('sha256').update(raw).digest('hex')
+}
 
 function loadOverrides() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../.runtime-overrides.json'), 'utf8')) } catch { return {} }
@@ -55,8 +63,9 @@ router.post('/signup', async (req, res) => {
     const { name, email: emailAddr, password } = req.body
     if (!name?.trim() || !emailAddr?.trim() || !password)
       return res.status(400).json({ error: 'All fields are required.' })
-    if (password.length < 6)
-      return res.status(400).json({ error: 'Password must be at least 6 characters.' })
+    const _pol0 = getPasswordPolicy(loadOverrides())
+    const _pv0  = validatePassword(password, _pol0)
+    if (!_pv0.ok) return res.status(400).json({ error: _pv0.errors.join(' ') })
     if (!/\S+@\S+\.\S+/.test(emailAddr))
       return res.status(400).json({ error: 'Please enter a valid email address.' })
 
@@ -64,7 +73,7 @@ router.post('/signup', async (req, res) => {
     const { rows: existing } = await db.query('SELECT id FROM users WHERE email = $1', [norm])
     if (existing.length) return res.status(409).json({ error: 'An account with this email already exists.' })
 
-    const hash     = await bcrypt.hash(password, 12)
+    const hash     = await hashPassword(password)
     const colorIdx = userCount % COLORS.length
     const id       = uuidv4()
 
@@ -102,8 +111,12 @@ router.post('/login', async (req, res) => {
     const user = rows[0]
     if (user.is_active === false)
       return res.status(403).json({ error: 'This account has been deactivated. Contact an admin.' })
-    if (!await bcrypt.compare(password, user.password))
-      return res.status(401).json({ error: 'Incorrect password.' })
+    const { ok: pwOk, needsRehash } = await comparePassword(password, user.password)
+    if (!pwOk) return res.status(401).json({ error: 'Incorrect password.' })
+    if (needsRehash) {
+      const newHash = await hashPassword(password)
+      await db.query('UPDATE users SET password = $1 WHERE id = $2', [newHash, user.id])
+    }
 
     const { password: _, ...pub } = user
     res.cookie('token', makeToken(pub), cookieOpts())
@@ -135,9 +148,10 @@ router.get('/me', requireAuth, async (req, res) => {
 })
 
 // ── PATCH /api/auth/profile ───────────────────────────────────────────────────
+const filestore = require('../filestore')
 router.patch('/profile', requireAuth, async (req, res) => {
   try {
-    const { name, email, color, currentPassword, newPassword } = req.body
+    const { name, email, color, currentPassword, newPassword, avatarMimeType } = req.body
     const { rows } = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id])
     if (!rows.length) return res.status(404).json({ error: 'User not found' })
     const user = rows[0]
@@ -145,7 +159,17 @@ router.patch('/profile', requireAuth, async (req, res) => {
     const updates = {}
     if (name?.trim())  { updates.name = name.trim(); updates.initials = getInitials(name.trim()) }
     if (color)         { updates.color = color }
-    if (req.body.avatar !== undefined) { updates.avatar = req.body.avatar || null }
+    if (req.body.avatar !== undefined) {
+      if (req.body.avatar === null) {
+        // Remove avatar — delete file if exists
+        filestore.deleteAvatar(user.avatar)
+        updates.avatar = null
+      } else if (req.body.avatar && avatarMimeType) {
+        // Save new avatar to disk, store relative path
+        filestore.deleteAvatar(user.avatar)
+        updates.avatar = filestore.saveAvatar(user.id, req.body.avatar, avatarMimeType)
+      }
+    }
     if (email?.trim()) {
       const normalized = email.trim().toLowerCase()
       if (normalized !== user.email) {
@@ -158,11 +182,12 @@ router.patch('/profile', requireAuth, async (req, res) => {
     }
     if (newPassword) {
       if (!currentPassword) return res.status(400).json({ error: 'Current password is required.' })
-      if (!await bcrypt.compare(currentPassword, user.password))
-        return res.status(401).json({ error: 'Current password is incorrect.' })
-      if (newPassword.length < 6)
-        return res.status(400).json({ error: 'New password must be at least 6 characters.' })
-      updates.password = await bcrypt.hash(newPassword, 12)
+      const { ok: curOk } = await comparePassword(currentPassword, user.password)
+      if (!curOk) return res.status(401).json({ error: 'Current password is incorrect.' })
+      const _pol2 = getPasswordPolicy(loadOverrides())
+      const _pv2  = validatePassword(newPassword, _pol2)
+      if (!_pv2.ok) return res.status(400).json({ error: _pv2.errors.join(' ') })
+      updates.password = await hashPassword(newPassword)
     }
 
     if (Object.keys(updates).length) {
@@ -282,7 +307,7 @@ router.post('/invite', requireAuth, async (req, res) => {
     const { rows: [{ count }] } = await db.query('SELECT COUNT(*)::int as count FROM users')
     // Generate a random temp password
     const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase() + '!'
-    const hash     = await bcrypt.hash(tempPassword, 12)
+    const hash     = await hashPassword(tempPassword)
     const colorIdx = count % COLORS.length
     const id       = uuidv4()
 
@@ -305,62 +330,139 @@ router.post('/invite', requireAuth, async (req, res) => {
   }
 })
 
-module.exports = router
 
 // ── POST /api/auth/forgot-password ────────────────────────────────────────────
+// Rate limited tightly (5/15min) in index.js.
+// Never returns a token or URL in the response under any circumstances.
+// If SMTP is configured: emails a link. If not: gracefully tells the user
+// to contact their admin, who uses Settings → Team → Reset Link instead.
 router.post('/forgot-password', async (req, res) => {
   const { email: emailAddr } = req.body
   if (!emailAddr) return res.status(400).json({ error: 'Email required' })
+  // Always identical response regardless of outcome — prevents email enumeration
+  const GENERIC = { ok: true, emailSent: false }
   try {
-    const { rows: [user] } = await db.query('SELECT id, name FROM users WHERE email = $1', [emailAddr.toLowerCase().trim()])
-    if (!user) return res.json({ ok: true, emailSent: false, message: 'If that email exists, a reset token has been generated.' })
+    const { rows: [user] } = await db.query(
+      'SELECT id, name FROM users WHERE email = $1 AND is_active = TRUE',
+      [emailAddr.toLowerCase().trim()]
+    )
+    if (!user) return res.json(GENERIC)
 
-    // Expire old tokens
     await db.query('UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE', [user.id])
 
-    const token   = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '')
-    const expires = new Date(Date.now() + 60 * 60 * 1000)
+    const rawToken  = crypto.randomBytes(32).toString('hex')
+    const tokenHash = hashToken(rawToken)
+    const expires   = new Date(Date.now() + 15 * 60 * 1000)
+    const requestIp = req.ip || req.connection.remoteAddress || ''
+
     await db.query(
-      'INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1,$2,$3,$4)',
-      [uuidv4(), user.id, token, expires]
+      'INSERT INTO password_reset_tokens (id, user_id, token, expires_at, request_ip) VALUES ($1,$2,$3,$4,$5)',
+      [uuidv4(), user.id, tokenHash, expires, requestIp]
     )
 
-    const origin   = process.env.APP_URL || ''
-    const resetUrl = `${origin}/reset-password.html?token=${token}`
-    const smtp     = emailSvc.getSmtpConfig()
-
+    const smtp = emailSvc.getSmtpConfig()
     if (smtp.enabled) {
-      const result = await emailSvc.sendPasswordReset({ to: emailAddr.toLowerCase().trim(), name: user.name, resetUrl })
+      const origin   = process.env.APP_URL || ''
+      const resetUrl = `${origin}/reset-password.html?token=${rawToken}`
+      const result   = await emailSvc.sendPasswordReset({ to: emailAddr.toLowerCase().trim(), name: user.name, resetUrl })
       if (result.ok) return res.json({ ok: true, emailSent: true })
-      // Email failed — fall through to return token directly
     }
 
-    // No SMTP or send failed: return token so admin/user can share it manually
-    res.json({ ok: true, emailSent: false, token, resetUrl, message: `Reset link generated for ${user.name}.` })
+    // SMTP not configured or failed — never expose the token
+    res.json(GENERIC)
   } catch (err) {
     console.error('forgot password:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
 
-// ── POST /api/auth/reset-password ─────────────────────────────────────────────
-router.post('/reset-password', async (req, res) => {
-  const { token, password } = req.body
-  if (!token || !password) return res.status(400).json({ error: 'Token and password required' })
-  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
+// ── GET /api/auth/admin/reset-link/:userId ─────────────────────────────────────
+// Admin-only. The ONLY way to get a reset URL when SMTP isn't configured.
+// Returns the one-time URL. Token is consumed on first page load (validate endpoint).
+router.get('/admin/reset-link/:userId', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   try {
-    const { rows: [row] } = await db.query(
-      `SELECT r.id, r.user_id, r.expires_at, r.used
-       FROM password_reset_tokens r
-       WHERE r.token = $1`, [token]
-    )
-    if (!row)        return res.status(400).json({ error: 'Invalid or expired reset link' })
-    if (row.used)    return res.status(400).json({ error: 'This reset link has already been used' })
-    if (new Date(row.expires_at) < new Date()) return res.status(400).json({ error: 'Reset link has expired' })
+    const { rows: [user] } = await db.query('SELECT id, name, email FROM users WHERE id = $1', [req.params.userId])
+    if (!user) return res.status(404).json({ error: 'User not found' })
 
-    const hash = await bcrypt.hash(password, 12)
-    await db.query('UPDATE users SET password = $1 WHERE id = $2', [hash, row.user_id])
+    await db.query('UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE', [user.id])
+
+    const rawToken  = crypto.randomBytes(32).toString('hex')
+    const tokenHash = hashToken(rawToken)
+    const expires   = new Date(Date.now() + 15 * 60 * 1000)
+
+    await db.query(
+      'INSERT INTO password_reset_tokens (id, user_id, token, expires_at, request_ip) VALUES ($1,$2,$3,$4,$5)',
+      [uuidv4(), user.id, tokenHash, expires, 'admin-generated']
+    )
+
+    const origin   = process.env.APP_URL || ''
+    const resetUrl = `${origin}/reset-password.html?token=${rawToken}`
+    audit(req.user.id, 'user.admin_reset_link', 'user', user.id, user.name)
+    res.json({ ok: true, resetUrl, expiresIn: '15 minutes' })
+  } catch (err) {
+    console.error('admin reset link:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── GET /api/auth/reset-password/validate ─────────────────────────────────────
+// Called once when the reset page loads. Validates + consumes the URL token
+// immediately, then issues a short-lived in-memory session ID (sessionKey).
+// The URL token is gone from memory after this — the browser holds only sessionKey.
+router.get('/reset-password/validate', async (req, res) => {
+  const { token } = req.query
+  if (!token) return res.status(400).json({ error: 'Token required' })
+  try {
+    const tokenHash = hashToken(token)
+    const { rows: [row] } = await db.query(
+      `SELECT r.id, r.user_id, r.used, r.expires_at, u.name, u.email
+       FROM password_reset_tokens r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.token = $1`, [tokenHash]
+    )
+    if (!row || row.used || new Date(row.expires_at) < new Date())
+      return res.status(400).json({ error: 'Invalid or expired reset link' })
+
+    // Consume the URL token immediately — it can never be used again
     await db.query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [row.id])
+
+    // Issue a short-lived session key (5 min) stored server-side
+    const sessionKey = crypto.randomBytes(32).toString('hex')
+    const sessionExp = new Date(Date.now() + 5 * 60 * 1000)
+    await db.query(
+      'INSERT INTO password_reset_sessions (id, user_id, expires_at) VALUES ($1,$2,$3)',
+      [sessionKey, row.user_id, sessionExp]
+    )
+
+    res.json({ ok: true, sessionKey, name: row.name, email: row.email })
+  } catch (err) {
+    console.error('reset validate:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/auth/reset-password ─────────────────────────────────────────────
+// Accepts sessionKey (from validate step), not the original URL token.
+// sessionKey exists only in JS memory — never in the URL or localStorage.
+router.post('/reset-password', async (req, res) => {
+  const { sessionKey, password } = req.body
+  if (!sessionKey || !password) return res.status(400).json({ error: 'Session key and password required' })
+  const _pol3 = getPasswordPolicy(loadOverrides())
+  const _pv3  = validatePassword(password, _pol3)
+  if (!_pv3.ok) return res.status(400).json({ error: _pv3.errors.join(' ') })
+  try {
+    const { rows: [session] } = await db.query(
+      'SELECT id, user_id, expires_at, used FROM password_reset_sessions WHERE id = $1',
+      [sessionKey]
+    )
+    if (!session)       return res.status(400).json({ error: 'Invalid or expired session' })
+    if (session.used)   return res.status(400).json({ error: 'This reset session has already been used' })
+    if (new Date(session.expires_at) < new Date()) return res.status(400).json({ error: 'Reset session has expired' })
+
+    const hash = await hashPassword(password)
+    await db.query('UPDATE users SET password = $1 WHERE id = $2', [hash, session.user_id])
+    await db.query('UPDATE password_reset_sessions SET used = TRUE WHERE id = $1', [session.id])
     res.json({ ok: true })
   } catch (err) {
     console.error('reset password:', err.message)
@@ -368,21 +470,4 @@ router.post('/reset-password', async (req, res) => {
   }
 })
 
-// ── GET /api/auth/reset-password/validate ────────────────────────────────────
-router.get('/reset-password/validate', async (req, res) => {
-  const { token } = req.query
-  if (!token) return res.status(400).json({ error: 'Token required' })
-  try {
-    const { rows: [row] } = await db.query(
-      `SELECT r.used, r.expires_at, u.name, u.email
-       FROM password_reset_tokens r
-       JOIN users u ON u.id = r.user_id
-       WHERE r.token = $1`, [token]
-    )
-    if (!row || row.used || new Date(row.expires_at) < new Date())
-      return res.status(400).json({ error: 'Invalid or expired reset link' })
-    res.json({ ok: true, name: row.name, email: row.email })
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' })
-  }
-})
+module.exports = router

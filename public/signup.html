@@ -51,7 +51,7 @@
       <div class="form-group">
         <label class="form-label req" for="password">Password</label>
         <div class="pw-wrap">
-          <input class="form-control" type="password" id="password" name="password" autocomplete="new-password" placeholder="Min. 6 characters" />
+          <input class="form-control" type="password" id="password" name="password" autocomplete="new-password" placeholder="Create a password" id="password" />
           <button type="button" class="pw-toggle" id="pw-toggle-1" title="Show/hide">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
@@ -107,6 +107,12 @@
     pwToggle('password', 'pw-toggle-1')
     pwToggle('confirm',  'pw-toggle-2')
 
+    // Password strength indicator
+    const pwInput = document.getElementById('password')
+    const pwIndicator = createPasswordIndicator()
+    pwInput.parentElement.after(pwIndicator)
+    pwInput.addEventListener('input', () => updatePasswordIndicator(pwIndicator, pwInput.value))
+
     const form    = document.getElementById('signup-form')
     const errEl   = document.getElementById('form-error')
     const submitBtn = document.getElementById('submit-btn')
@@ -135,8 +141,8 @@
       if (!name)    { fieldErr('name', 'Full name is required.');   valid = false }
       if (!email)   { fieldErr('email', 'Email is required.');      valid = false }
       else if (!/\S+@\S+\.\S+/.test(email)) { fieldErr('email', 'Enter a valid email.'); valid = false }
-      if (!password)          { fieldErr('password', 'Password is required.'); valid = false }
-      else if (password.length < 6) { fieldErr('password', 'Min. 6 characters.'); valid = false }
+      if (!password) { fieldErr('password', 'Password is required.'); valid = false }
+      else { const pv = validatePassword(password); if (!pv.ok) { fieldErr('password', pv.errors.join(' ')); valid = false } }
       if (password !== confirm) { fieldErr('confirm', 'Passwords do not match.'); valid = false }
       if (!valid) return
 

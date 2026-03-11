@@ -88,6 +88,7 @@ msg_ok "Node.js dependencies installed"
 # ── 8. Write .env ─────────────────────────────────────────────────────────────
 msg_info "Writing configuration"
 JWT_SECRET=$(openssl rand -hex 48)
+PASSWORD_PEPPER=$(openssl rand -hex 32)
 cat > /opt/forgetrack/.env.${APP_ENV} << ENVEOF
 NODE_ENV=${APP_ENV}
 PORT=3000
@@ -95,6 +96,7 @@ APP_NAME=ForgeTrack
 APP_ENV=${APP_ENV}
 APP_URL=http://$(hostname -I | awk '{print $1}'):3000
 JWT_SECRET=${JWT_SECRET}
+PASSWORD_PEPPER=${PASSWORD_PEPPER}
 DATABASE_URL=postgresql://forgetrack:${DB_PASS}@localhost:5432/forgetrack
 COOKIE_SECURE=${COOKIE_SECURE}
 TRUST_PROXY=false

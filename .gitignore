@@ -18,3 +18,7 @@ data/
 
 # Keep only the example template
 !.env.example
+
+# User-uploaded files — stored on disk, never committed
+# Back these up separately (e.g. rsync, Proxmox snapshot)
+uploads/

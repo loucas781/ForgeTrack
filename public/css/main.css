@@ -620,19 +620,30 @@ select.form-control {
 
   /* Override the topbar-centric white-on-dark input styles for the mobile overlay */
   .topbar-search-open .topbar-search-input {
-    background: var(--surface);
-    border-color: var(--border);
-    color: var(--text);
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+    -webkit-text-fill-color: var(--text) !important;
   }
   .topbar-search-open .topbar-search-input::placeholder {
-    color: var(--text-3);
+    color: var(--text-3) !important;
+    -webkit-text-fill-color: var(--text-3) !important;
+    opacity: 1;
   }
   .topbar-search-open .topbar-search-input:focus {
-    background: var(--surface);
-    border-color: var(--brand);
+    background: var(--surface) !important;
+    border-color: var(--brand) !important;
+    color: var(--text) !important;
   }
   .topbar-search-open .topbar-search-icon {
-    color: var(--text-3);
+    color: var(--text-3) !important;
+  }
+  /* Search results in mobile overlay — ensure readable text */
+  .topbar-search-open .search-results {
+    color: var(--text);
+  }
+  .topbar-search-open .search-result-item {
+    color: var(--text);
   }
   /* Results dropdown: not absolutely positioned in overlay — flow naturally */
   .topbar-search-open .search-results {

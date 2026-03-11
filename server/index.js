@@ -64,6 +64,7 @@ const cookieParser = require('cookie-parser')
 const rateLimit    = require('express-rate-limit')
 const { requireAuth, optionalAuth } = require('./middleware/auth')
 const email = require('./email')
+const { getPasswordPolicy, DEFAULT_POLICY } = require('./auth-utils')
 
 const app = express()
 
@@ -94,22 +95,44 @@ app.use('/api/auth', rateLimit({
   message: { error: 'Too many attempts — please wait 15 minutes and try again.' },
 }))
 
+// Tighter rate limit specifically for password reset requests — 5 per 15 min
+app.use('/api/auth/forgot-password', rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  skip: () => process.env.APP_ENV === 'development',
+  message: { error: 'Too many password reset attempts — please wait 15 minutes.' },
+}))
+
 // Serve static assets (CSS, JS, images etc.) but not directory indexes
 // HTML files are handled explicitly below so auth guards run first
 app.use(express.static(path.join(__dirname, '../public'), { index: false }))
+
+// Serve uploaded files (avatars, attachments) — requires authentication
+// Files are served from disk, never exposed without a valid session
+const { requireAuth: _requireAuth } = require('./middleware/auth')
+const uploadsDir = path.join(__dirname, '../uploads')
+app.use('/uploads', _requireAuth, (req, res, next) => {
+  // Prevent directory traversal
+  const abs = path.resolve(path.join(uploadsDir, req.path))
+  if (!abs.startsWith(path.resolve(uploadsDir))) return res.status(403).end()
+  next()
+}, require('express').static(uploadsDir, { index: false, dotfiles: 'deny' }))
 
 // Inject APP_ENV into page responses via a small config endpoint
 app.get('/api/config', optionalAuth, (req, res) => {
   const overrides = loadOverrides()
   res.json({
-    appName:      process.env.APP_NAME      || 'ForgeTrack',
-    appEnv:       process.env.APP_ENV       || env,
-    version:      APP_VERSION,
-    user:         req.user || null,
-    cookieSecure: process.env.COOKIE_SECURE === 'true',
-    trustProxy:   (overrides.TRUST_PROXY ?? process.env.TRUST_PROXY) === 'true',
-    allowSignup:  (overrides.ALLOW_SIGNUP ?? 'true') !== 'false',
-    smtpEnabled:  email.getSmtpConfig().enabled,
+    appName:        process.env.APP_NAME      || 'ForgeTrack',
+    appEnv:         process.env.APP_ENV       || env,
+    version:        APP_VERSION,
+    user:           req.user || null,
+    cookieSecure:   process.env.COOKIE_SECURE === 'true',
+    trustProxy:     (overrides.TRUST_PROXY ?? process.env.TRUST_PROXY) === 'true',
+    allowSignup:    (overrides.ALLOW_SIGNUP ?? 'true') !== 'false',
+    smtpEnabled:    email.getSmtpConfig().enabled,
+    passwordPolicy: getPasswordPolicy(overrides),
   })
 })
 
@@ -134,6 +157,31 @@ app.patch('/api/config', requireAuth, (req, res) => {
     trustProxy:      overrides.TRUST_PROXY === 'true',
     restartRequired,
   })
+})
+
+// ── PATCH /api/config/password-policy — admin: update password policy ───────
+app.patch('/api/config/password-policy', requireAuth, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  const overrides = loadOverrides()
+  const current   = getPasswordPolicy(overrides)
+  const allowed   = ['minLength', 'requireUpper', 'requireLower', 'requireNumber', 'requireSpecial', 'noSequential']
+  const updated   = { ...current }
+
+  for (const key of allowed) {
+    if (key === 'minLength') {
+      if (req.body[key] !== undefined) {
+        const v = parseInt(req.body[key])
+        if (isNaN(v) || v < 6 || v > 128) return res.status(400).json({ error: 'minLength must be between 6 and 128' })
+        updated[key] = v
+      }
+    } else if (typeof req.body[key] === 'boolean') {
+      updated[key] = req.body[key]
+    }
+  }
+
+  overrides.PASSWORD_POLICY = updated
+  saveOverrides(overrides)
+  res.json({ ok: true, passwordPolicy: updated })
 })
 
 // ── GET /api/audit — admin: paginated audit log ───────────────────────────────

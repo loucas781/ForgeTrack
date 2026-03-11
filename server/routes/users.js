@@ -1,7 +1,12 @@
 'use strict'
 const router  = require('express').Router()
 const db      = require('../db/connection')
-const bcrypt  = require('bcryptjs')
+const { hashPassword, getPasswordPolicy, validatePassword } = require('../auth-utils')
+const fs   = require('fs')
+const path = require('path')
+function loadOverrides() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../.runtime-overrides.json'), 'utf8')) } catch { return {} }
+}
 const { requireAuth } = require('../middleware/auth')
 const audit   = require('../audit')
 
@@ -65,11 +70,13 @@ router.patch('/:id', async (req, res) => {
 router.post('/:id/set-password', async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
   const { password } = req.body
-  if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' })
+  const _pol = getPasswordPolicy(loadOverrides())
+  const _pv  = validatePassword(password, _pol)
+  if (!_pv.ok) return res.status(400).json({ error: _pv.errors.join(' ') })
   try {
     const { rows: [target] } = await db.query('SELECT id, name FROM users WHERE id = $1', [req.params.id])
     if (!target) return res.status(404).json({ error: 'User not found' })
-    const hash = await bcrypt.hash(password, 12)
+    const hash = await hashPassword(password)
     await db.query('UPDATE users SET password = $1 WHERE id = $2', [hash, req.params.id])
     audit(req.user.id, 'user.set_password', 'user', req.params.id, target.name)
     res.json({ ok: true })

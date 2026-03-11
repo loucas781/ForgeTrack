@@ -99,7 +99,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">New Password</label>
-              <input class="form-control" type="password" id="pf-new-pw" placeholder="Min. 6 characters" autocomplete="new-password" />
+              <input class="form-control" type="password" id="pf-new-pw" placeholder="New password" autocomplete="new-password" />
             </div>
             <div class="form-group" style="margin-bottom:20px">
               <label class="form-label">Confirm New Password</label>
@@ -126,14 +126,16 @@
     const avatarWrap = document.getElementById('avatar-wrap')
     const fileInput  = document.getElementById('avatar-file-input')
     avatarWrap.addEventListener('click', () => fileInput.click())
+    let avatarMimeType = null
     fileInput.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
       if (file.size > 2 * 1024 * 1024) { alert('Image must be under 2MB'); return }
+      avatarMimeType = file.type
       const reader = new FileReader()
       reader.onload = ev => {
         avatarDataUrl = ev.target.result
-        // Show preview as circular image
+        // Show preview as circular image (local blob URL before save)
         document.getElementById('avatar-preview').innerHTML =
           `<img src="${avatarDataUrl}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;display:block" />`
         document.getElementById('avatar-hint').textContent = 'Photo selected — click Save to apply'
@@ -157,7 +159,7 @@
           email: document.getElementById('pf-email').value.trim(),
           color: selectedColor,
         }
-        if (avatarDataUrl) body.avatar = avatarDataUrl
+        if (avatarDataUrl) { body.avatar = avatarDataUrl; body.avatarMimeType = avatarMimeType }
         const res  = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify(body) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
@@ -177,6 +179,14 @@
       } catch (err) { errEl.textContent = err.message; errEl.style.display = 'flex' }
     })
 
+    // Password strength indicator on profile new-password field
+    const profilePwInput = document.getElementById('pf-new-pw')
+    if (profilePwInput) {
+      const profilePwIndicator = createPasswordIndicator()
+      profilePwInput.parentElement.after(profilePwIndicator)
+      profilePwInput.addEventListener('input', () => updatePasswordIndicator(profilePwIndicator, profilePwInput.value))
+    }
+
     // Password save
     document.getElementById('pw-form').addEventListener('submit', async e => {
       e.preventDefault()
@@ -185,6 +195,7 @@
       const newPw = document.getElementById('pf-new-pw').value
       const conPw = document.getElementById('pf-con-pw').value
       if (newPw !== conPw) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'flex'; return }
+      const profilePv = validatePassword(newPw); if (!profilePv.ok) { errEl.textContent = profilePv.errors.join(' '); errEl.style.display = 'flex'; return }
       try {
         const res  = await fetch('/api/auth/profile', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ currentPassword: document.getElementById('pf-cur-pw').value, newPassword: newPw }) })
         const data = await res.json()
