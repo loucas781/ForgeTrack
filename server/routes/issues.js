@@ -11,8 +11,8 @@ router.use(requireAuth)
 async function getIssue(id) {
   const { rows } = await db.query(`
     SELECT i.*,
-      a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color,
-      r.name as reporter_name, r.initials as reporter_initials, r.color as reporter_color
+      a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color, a.avatar as assignee_avatar,
+      r.name as reporter_name, r.initials as reporter_initials, r.color as reporter_color, r.avatar as reporter_avatar
     FROM issues i
     LEFT JOIN users a ON a.id = i.assignee_id
     LEFT JOIN users r ON r.id = i.reporter_id
@@ -25,7 +25,7 @@ async function getIssue(id) {
     'SELECT label FROM issue_labels WHERE issue_id = $1 ORDER BY label', [id]
   )
   const { rows: comments } = await db.query(`
-    SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color
+    SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color, u.avatar as author_avatar
     FROM comments c
     LEFT JOIN users u ON u.id = c.author_id
     WHERE c.issue_id = $1
@@ -44,8 +44,8 @@ router.get('/', async (req, res) => {
 
     let sql = `
       SELECT i.*,
-        a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color,
-        r.name as reporter_name, r.initials as reporter_initials,
+        a.name as assignee_name, a.initials as assignee_initials, a.color as assignee_color, a.avatar as assignee_avatar,
+        r.name as reporter_name, r.initials as reporter_initials, r.color as reporter_color, r.avatar as reporter_avatar,
         p.name as project_name,
         (SELECT COUNT(*)::int FROM comments c WHERE c.issue_id = i.id) as comment_count
       FROM issues i
@@ -240,7 +240,7 @@ router.post('/:id/comments', async (req, res) => {
     await db.query('UPDATE issues SET updated_at = NOW() WHERE id = $1', [req.params.id])
 
     const { rows: [comment] } = await db.query(`
-      SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color
+      SELECT c.*, u.name as author_name, u.initials as author_initials, u.color as author_color, u.avatar as author_avatar
       FROM comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.id = $1
     `, [id])
     audit(req.user.id, 'comment.create', 'issue', req.params.id, null, { preview: body.trim().slice(0, 80) })

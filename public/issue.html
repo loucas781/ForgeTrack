@@ -69,8 +69,8 @@
     const content = document.getElementById('page-content')
 
     function render(iss) {
-      const assignee = iss.assignee_id ? { name:iss.assignee_name, initials:iss.assignee_initials, color:iss.assignee_color } : null
-      const reporter = iss.reporter_id ? { name:iss.reporter_name, initials:iss.reporter_initials, color:iss.reporter_color } : null
+      const assignee = iss.assignee_id ? { name:iss.assignee_name, initials:iss.assignee_initials, color:iss.assignee_color, avatar:iss.assignee_avatar } : null
+      const reporter = iss.reporter_id ? { name:iss.reporter_name, initials:iss.reporter_initials, color:iss.reporter_color, avatar:iss.reporter_avatar } : null
 
       content.innerHTML = `
         <div class="page-pad">
@@ -211,7 +211,7 @@
     }
 
     function commentHtml(c, me) {
-      const author = { name: c.author_name, initials: c.author_initials, color: c.author_color }
+      const author = { name: c.author_name, initials: c.author_initials, color: c.author_color, avatar: c.author_avatar }
       const canDeleteThisComment = c.author_id === me?.id || canManage
       return `
         <div class="comment" data-cid="${c.id}">

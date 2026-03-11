@@ -105,6 +105,7 @@
     document.title = 'Settings — ForgeTrack'
 
     const [config, users, projects, issues] = await Promise.all([GET('/config'), GET('/users'), GET('/projects'), GET('/issues')])
+    if (typeof APP_CONFIG !== 'undefined') Object.assign(APP_CONFIG, config)
     const me      = config.user
     const isAdmin = me?.role === 'admin'
 

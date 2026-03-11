@@ -10,7 +10,7 @@ router.use(requireAuth)
 
 async function getProject(id) {
   const { rows } = await db.query(`
-    SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color,
+    SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color, u.avatar as lead_avatar,
       (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id
          AND i.status NOT IN ('done','cancelled')) as open_issues,
       (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id) as total_issues
@@ -25,7 +25,7 @@ async function getProject(id) {
 router.get('/', async (req, res) => {
   try {
     const { rows } = await db.query(`
-      SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color,
+      SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color, u.avatar as lead_avatar,
         (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id
            AND i.status NOT IN ('done','cancelled')) as open_issues,
         (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id) as total_issues
