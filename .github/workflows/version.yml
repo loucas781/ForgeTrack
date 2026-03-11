@@ -118,9 +118,14 @@ jobs:
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-rc"
 
           elif [[ "$BRANCH" == "develop" ]]; then
-            # Dev: use total git commit count as build number — always accurate,
-            # never drifts, immune to manual zip uploads resetting the counter.
-            DEV_NUM=$(git rev-list --count HEAD)
+            # Dev: extract current build number from .version and increment by 1.
+            # This is simple, predictable, and always goes up by exactly 1 per push.
+            if echo "$CURRENT" | grep -q '\-dev\.'; then
+              LAST_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
+            else
+              LAST_NUM=0
+            fi
+            DEV_NUM=$(( LAST_NUM + 1 ))
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_NUM}"
           fi
 
