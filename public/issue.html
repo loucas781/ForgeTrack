@@ -58,12 +58,13 @@
 
     const project = await GET('/projects/' + issue.project_id).catch(() => null)
     const users   = await GET('/users')
-    const config  = await GET('/config')
-    const me      = config.user
-    const canManage = userCanManageProject(project)  // lead of this project, or admin
 
     injectShell({ project, activePage: 'issues' })
-    await initTopbar()
+    await initTopbar()  // must run before userCanManageProject so APP_CONFIG.user is set
+
+    const me             = APP_CONFIG?.user
+    const canManage      = userCanManageProject(project)  // lead of this project, or admin
+    const canChangeStatus = canManage || (me?.id && issue.assignee_id === me.id)  // also assignee
 
     document.title = `${issue.key} — ForgeTrack`
     const content = document.getElementById('page-content')
@@ -141,7 +142,7 @@
               <div class="card sidebar-card">
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Status</div>
-                  ${canManage
+                  ${canChangeStatus
                     ? `<select class="form-control" id="sf-status">${['todo','inprogress','review','done','cancelled'].map(s=>`<option value="${s}"${s===iss.status?' selected':''}>${STATUS_LABELS[s]}</option>`).join('')}</select>`
                     : `<div class="text-2 text-sm">${STATUS_LABELS[iss.status]||iss.status}</div>`}
                 </div>
@@ -228,13 +229,18 @@
     }
 
     async function wireEvents(iss) {
-      // Sidebar field saves — only wired for leads/admins
-      if (canManage) {
-        async function saveField(field, value) {
-          try { await PATCH('/issues/' + issueId, { [field]: value }); toast('Saved', 'success') }
-          catch (err) { toast(err.message, 'error') }
-        }
+      async function saveField(field, value) {
+        try { await PATCH('/issues/' + issueId, { [field]: value }); toast('Saved', 'success') }
+        catch (err) { toast(err.message, 'error') }
+      }
+
+      // Status can be changed by assignees as well as leads/admins
+      if (canChangeStatus) {
         document.getElementById('sf-status')?.addEventListener('change', e => saveField('status', e.target.value))
+      }
+
+      // All other sidebar field saves — leads/admins only
+      if (canManage) {
         document.getElementById('sf-priority')?.addEventListener('change', e => saveField('priority', e.target.value))
         document.getElementById('sf-type')?.addEventListener('change', e => saveField('type', e.target.value))
         document.getElementById('sf-assignee')?.addEventListener('change', e => saveField('assignee_id', e.target.value || null))

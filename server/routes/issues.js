@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
-const { canEditIssue, canDeleteComment } = require('../permissions')
+const { canEditIssue, canUpdateIssueStatus, canDeleteComment } = require('../permissions')
 
 router.use(requireAuth)
 
@@ -158,8 +158,20 @@ router.patch('/:id', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Issue not found' })
     const issue = rows[0]
     const proj  = { id: issue.project_id, lead_id: issue.lead_id }
-    if (!canEditIssue(req.user, proj))
-      return res.status(403).json({ error: 'Only admins or the project lead can edit issues.' })
+
+    // Determine what the request is trying to change
+    const STATUS_ONLY_FIELDS = new Set(['status'])
+    const requestedFields = Object.keys(req.body).filter(k => req.body[k] !== undefined)
+    const isStatusOnlyUpdate = requestedFields.length > 0 && requestedFields.every(k => STATUS_ONLY_FIELDS.has(k))
+
+    // Assignees may update status only; full edits require lead/admin
+    if (isStatusOnlyUpdate) {
+      if (!canUpdateIssueStatus(req.user, issue, proj))
+        return res.status(403).json({ error: 'You must be the assignee, project lead, or admin to update this issue.' })
+    } else {
+      if (!canEditIssue(req.user, proj))
+        return res.status(403).json({ error: 'Only admins or the project lead can edit issues.' })
+    }
 
     const allowed = ['title','description','type','status','priority','assignee_id','story_points','due_date']
     const updates = {}

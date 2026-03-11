@@ -98,7 +98,7 @@
                 ? `<div class="empty-state"><p>No activity yet</p></div>`
                 : recent.map(i => {
                     const proj = projects.find(p => p.id === i.project_id)
-                    const asgn = i.assignee_id ? { name: i.assignee_name, initials: i.assignee_initials, color: i.assignee_color } : null
+                    const asgn = i.assignee_id ? { name: i.assignee_name, initials: i.assignee_initials, color: i.assignee_color, avatar: i.assignee_avatar } : null
                     return `
                       <div class="issue-row" onclick="location.href='/issue.html?id=${i.id}'" style="height:auto;padding:10px 16px">
                         ${typeIcon(i.type)}

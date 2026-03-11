@@ -151,6 +151,9 @@ jobs:
       - name: Create or replace Git tag
         run: |
           TAG="${{ steps.bump.outputs.tag }}"
+          # Fetch all tags so we have an accurate local picture before deleting
+          git fetch --tags --force 2>/dev/null || true
+          # Delete locally and remotely if the tag already exists (e.g. re-run)
           git tag -d "$TAG" 2>/dev/null || true
           git push origin ":refs/tags/$TAG" 2>/dev/null || true
           git tag -a "$TAG" -m "Release ${{ steps.bump.outputs.new_version }} from ${{ steps.branch.outputs.name }}"
