@@ -52,7 +52,8 @@ if (APP_ENV_NORM === 'production') {
   APP_VERSION = rawVersion.includes('-rc') ? rawVersion : `${baseVersion}-rc`
 } else {
   // On develop/local, use the raw version as-is (includes -dev.N)
-  APP_VERSION = rawVersion
+  // If no dev suffix exists (e.g. fresh install), add a placeholder
+  APP_VERSION = rawVersion.includes('-dev.') ? rawVersion : `${baseVersion}-dev.0`
 }
 
 // ─── Run migration on startup ─────────────────────────────────────────────────
