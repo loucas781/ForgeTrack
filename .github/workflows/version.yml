@@ -7,12 +7,11 @@ name: Version
 
 on:
   # develop: bump on every push (auto-increments dev counter)
+  # Loop prevention is handled by the [skip ci] check in the job if-condition below,
+  # NOT by paths-ignore — paths-ignore would silently skip runs when .version or
+  # BUILDCOUNT are legitimately part of a commit (e.g. after restoring from a zip).
   push:
     branches: [develop]
-    paths-ignore:
-      - '.version'
-      - 'package.json'
-      - 'BUILDCOUNT'
 
   # staging + main: bump when a PR is merged INTO them
   pull_request:
