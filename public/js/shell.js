@@ -229,7 +229,7 @@ function injectShell(opts = {}) {
   const bottomNav = opts.project
     ? buildProjectBottomNav(opts.project, opts.activePage || '')
     : buildDashboardBottomNav()
-  const contentId = opts.contentId || 'page-inner'
+  const contentId = opts.contentId || 'page-content'
 
   root.innerHTML = `
     <div class="app-shell">
