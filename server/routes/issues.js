@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
-const { canEditIssue, canUpdateIssueStatus, canDeleteComment } = require('../permissions')
+const { canEditIssue, canEditOwnIssue, canEditIssueMeta, canUpdateIssueStatus, canDeleteComment } = require('../permissions')
 
 router.use(requireAuth)
 
@@ -160,17 +160,23 @@ router.patch('/:id', async (req, res) => {
     const proj  = { id: issue.project_id, lead_id: issue.lead_id }
 
     // Determine what the request is trying to change
-    const STATUS_ONLY_FIELDS = new Set(['status'])
+    const META_FIELDS   = new Set(['priority', 'type'])
+    const STATUS_FIELDS = new Set(['status'])
     const requestedFields = Object.keys(req.body).filter(k => req.body[k] !== undefined)
-    const isStatusOnlyUpdate = requestedFields.length > 0 && requestedFields.every(k => STATUS_ONLY_FIELDS.has(k))
+    const isStatusOnlyUpdate = requestedFields.length > 0 && requestedFields.every(k => STATUS_FIELDS.has(k))
+    const touchesMeta    = requestedFields.some(k => META_FIELDS.has(k))
 
-    // Assignees may update status only; full edits require lead/admin
+    // Assignees may update status only
     if (isStatusOnlyUpdate) {
       if (!canUpdateIssueStatus(req.user, issue, proj))
         return res.status(403).json({ error: 'You must be the assignee, project lead, or admin to update this issue.' })
     } else {
-      if (!canEditIssue(req.user, proj))
-        return res.status(403).json({ error: 'Only admins or the project lead can edit issues.' })
+      // All other edits require being the creator, lead, or admin
+      if (!canEditOwnIssue(req.user, issue, proj))
+        return res.status(403).json({ error: 'You can only edit issues you created, or you must be the project lead or admin.' })
+      // Priority and type further restricted to leads/admins
+      if (touchesMeta && !canEditIssueMeta(req.user, proj))
+        return res.status(403).json({ error: 'Only the project lead or admin can change priority or type.' })
     }
 
     const allowed = ['title','description','type','status','priority','assignee_id','story_points','due_date']
@@ -225,8 +231,8 @@ router.delete('/:id', async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Issue not found' })
     const issue = rows[0]
     const proj  = { id: issue.project_id, lead_id: issue.lead_id }
-    if (!canEditIssue(req.user, proj))
-      return res.status(403).json({ error: 'Only admins or the project lead can delete issues.' })
+    if (!canEditOwnIssue(req.user, issue, proj))
+      return res.status(403).json({ error: 'You can only delete issues you created, or you must be the project lead or admin.' })
     await db.query('DELETE FROM issues WHERE id = $1', [req.params.id])
     audit(req.user.id, 'issue.delete', 'issue', issue.id, `${issue.key}: ${issue.title}`)
     res.json({ ok: true })

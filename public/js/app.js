@@ -391,6 +391,13 @@ async function initTopbar() {
     // Keyboard: Escape closes results
     searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchResults.classList.remove('show'); searchInput.blur() } })
   }
+
+  // Hide "New Project" from the Create menu for plain members
+  if (user?.role === 'member') {
+    document.getElementById('create-project-btn')?.remove()
+    document.getElementById('proj-menu-new')?.remove()
+  }
+
   initAttachmentPicker()
 }
 

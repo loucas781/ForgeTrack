@@ -85,7 +85,29 @@ h4 { font-size: 14px; font-weight: 600; }
 /* ── Layout shell ───────────────────────────────────────────────── */
 .app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .app-body  { display: flex; flex: 1; overflow: hidden; }
-.page-content { flex: 1; overflow-y: auto; }
+.page-content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+#page-inner   { flex: 1; }
+
+/* ── Footer ─────────────────────────────────────────────────────── */
+.app-footer {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px;
+  padding: 14px 24px;
+  margin-top: auto;
+  border-top: 1px solid var(--border-2);
+  font-size: 12px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.app-footer-sep { color: var(--border); }
+.app-footer-link {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--text-3); text-decoration: none;
+  transition: color var(--t-fast);
+}
+.app-footer-link:hover { color: var(--brand); }
+@media (max-width: 600px) {
+  .app-footer { padding-bottom: 80px; } /* clear bottom nav */
+}
 
 /* ── Topbar ─────────────────────────────────────────────────────── */
 .topbar {

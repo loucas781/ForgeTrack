@@ -35,7 +35,7 @@
     injectShell()
     await initTopbar()
     document.title = 'Profile — ForgeTrack'
-    const content = document.getElementById('page-content')
+    const content = document.getElementById('page-inner')
     const config = await GET('/config')
     const me = config.user
     let selectedColor = me?.color || '#0052cc'

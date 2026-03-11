@@ -46,7 +46,7 @@
       // Show a proper error rather than silently redirecting
       injectShell({})
       await initTopbar()
-      document.getElementById('page-content').innerHTML = `
+      document.getElementById('page-inner').innerHTML = `
         <div class="page-pad" style="max-width:500px;text-align:center;padding-top:80px">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="var(--text-3)" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:16px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
           <h2 style="margin-bottom:8px">Issue not found</h2>
@@ -64,10 +64,13 @@
 
     const me             = APP_CONFIG?.user
     const canManage      = userCanManageProject(project)  // lead of this project, or admin
+    const isOwnIssue     = me?.id && issue.created_by === me.id
+    const canEditIssue   = canManage || isOwnIssue         // leads/admins OR own issue
+    const canEditMeta    = canManage                       // priority, type: leads/admins only
     const canChangeStatus = canManage || (me?.id && issue.assignee_id === me.id)  // also assignee
 
     document.title = `${issue.key} — ForgeTrack`
-    const content = document.getElementById('page-content')
+    const content = document.getElementById('page-inner')
 
     function render(iss) {
       const assignee = iss.assignee_id ? { name:iss.assignee_name, initials:iss.assignee_initials, color:iss.assignee_color, avatar:iss.assignee_avatar } : null
@@ -90,7 +93,7 @@
               <!-- Title -->
               <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
                 ${typeIcon(iss.type)}
-                <div class="issue-title-text ${canManage ? 'inline-edit' : ''}" id="title-edit" ${canManage ? 'title="Click to edit"' : ''}>${esc(iss.title)}${canManage ? '<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' : ''}</div>
+                <div class="issue-title-text ${canEditIssue ? 'inline-edit' : ''}" id="title-edit" ${canEditIssue ? 'title="Click to edit"' : ''}>${esc(iss.title)}${canEditIssue ? '<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' : ''}</div>
               </div>
 
               <!-- Labels -->
@@ -99,7 +102,7 @@
               <!-- Description -->
               <section style="margin-bottom:32px">
                 <h4 style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border-2);padding-bottom:8px;margin-bottom:12px">Description</h4>
-                <div class="${canManage ? 'inline-edit' : ''}" id="desc-edit" style="font-size:14px;line-height:1.6;color:var(--text-2);white-space:pre-wrap;min-height:40px" ${canManage ? 'title="Click to edit"' : ''}>${esc(iss.description||(canManage?'Click to add a description…':'No description.'))}${canManage ? '<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' : ''}</div>
+                <div class="${canEditIssue ? 'inline-edit' : ''}" id="desc-edit" style="font-size:14px;line-height:1.6;color:var(--text-2);white-space:pre-wrap;min-height:40px" ${canEditIssue ? 'title="Click to edit"' : ''}>${esc(iss.description||(canEditIssue?'Click to add a description…':'No description.'))}${canEditIssue ? '<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' : ''}</div>
               </section>
 
               <!-- Attachments -->
@@ -148,19 +151,19 @@
                 </div>
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Priority</div>
-                  ${canManage
+                  ${canEditMeta
                     ? `<select class="form-control" id="sf-priority">${['critical','high','medium','low','trivial'].map(p=>`<option value="${p}"${p===iss.priority?' selected':''}>${PRIORITY_LABELS[p]}</option>`).join('')}</select>`
                     : `<div class="text-2 text-sm">${PRIORITY_LABELS[iss.priority]||iss.priority}</div>`}
                 </div>
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Type</div>
-                  ${canManage
+                  ${canEditMeta
                     ? `<select class="form-control" id="sf-type">${['bug','task','story','epic'].map(t=>`<option value="${t}"${t===iss.type?' selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>`
                     : `<div class="text-2 text-sm">${TYPE_LABELS[iss.type]||iss.type}</div>`}
                 </div>
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Assignee</div>
-                  ${canManage
+                  ${canEditIssue
                     ? `<select class="form-control" id="sf-assignee"><option value="">Unassigned</option>${users.map(u=>`<option value="${u.id}"${u.id===iss.assignee_id?' selected':''}>${esc(u.name)}</option>`).join('')}</select>`
                     : `<div style="display:flex;align-items:center;gap:8px;font-size:13px">${assignee ? `${avatarHtml(assignee,20)} <span>${esc(assignee.name)}</span>` : '<span class="text-3">Unassigned</span>'}</div>`}
                 </div>
@@ -172,19 +175,19 @@
                 </div>
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Story Points</div>
-                  ${canManage
+                  ${canEditIssue
                     ? `<input class="form-control" type="number" id="sf-points" min="0" max="100" value="${iss.story_points||''}" placeholder="—" />`
                     : `<div class="text-2 text-sm">${iss.story_points||'—'}</div>`}
                 </div>
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Due Date</div>
-                  ${canManage
+                  ${canEditIssue
                     ? `<input class="form-control" type="date" id="sf-due" value="${iss.due_date||''}" />`
                     : `<div class="text-2 text-sm">${iss.due_date||'—'}</div>`}
                 </div>
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Labels</div>
-                  ${canManage
+                  ${canEditIssue
                     ? `<input class="form-control" type="text" id="sf-labels" value="${esc((iss.labels||[]).join(', '))}" placeholder="comma separated" />`
                     : `<div class="text-2 text-sm">${(iss.labels||[]).length ? esc((iss.labels||[]).join(', ')) : '—'}</div>`}
                 </div>
@@ -197,7 +200,7 @@
                   <div class="sidebar-field-label">Updated</div>
                   <div class="text-2 text-sm">${fmtRelative(iss.updated_at)}</div>
                 </div>
-                ${canManage ? `
+                ${canEditIssue ? `
                 <hr class="divider" />
                 <button class="btn btn-danger btn-sm" style="width:100%" id="delete-issue-btn">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
@@ -239,10 +242,14 @@
         document.getElementById('sf-status')?.addEventListener('change', e => saveField('status', e.target.value))
       }
 
-      // All other sidebar field saves — leads/admins only
-      if (canManage) {
+      // Priority + type — leads/admins only
+      if (canEditMeta) {
         document.getElementById('sf-priority')?.addEventListener('change', e => saveField('priority', e.target.value))
         document.getElementById('sf-type')?.addEventListener('change', e => saveField('type', e.target.value))
+      }
+
+      // Assignee, points, due, labels, title, description, delete — leads/admins OR own issue
+      if (canEditIssue) {
         document.getElementById('sf-assignee')?.addEventListener('change', e => saveField('assignee_id', e.target.value || null))
         document.getElementById('sf-points')?.addEventListener('change', e => saveField('story_points', parseInt(e.target.value) || null))
         document.getElementById('sf-due')?.addEventListener('change', e => saveField('due_date', e.target.value || null))
