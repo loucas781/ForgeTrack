@@ -121,13 +121,23 @@ app.use('/uploads', _requireAuth, (req, res, next) => {
 }, require('express').static(uploadsDir, { index: false, dotfiles: 'deny' }))
 
 // Inject APP_ENV into page responses via a small config endpoint
-app.get('/api/config', optionalAuth, (req, res) => {
+app.get('/api/config', optionalAuth, async (req, res) => {
   const overrides = loadOverrides()
+  let user = null
+  if (req.user) {
+    try {
+      const { rows: [u] } = await require('./db/connection').query(
+        'SELECT id, name, email, initials, color, avatar, role FROM users WHERE id = $1',
+        [req.user.id]
+      )
+      user = u || null
+    } catch { user = req.user }
+  }
   res.json({
     appName:        process.env.APP_NAME      || 'ForgeTrack',
     appEnv:         process.env.APP_ENV       || env,
     version:        APP_VERSION,
-    user:           req.user || null,
+    user,
     cookieSecure:   process.env.COOKIE_SECURE === 'true',
     trustProxy:     (overrides.TRUST_PROXY ?? process.env.TRUST_PROXY) === 'true',
     allowSignup:    (overrides.ALLOW_SIGNUP ?? 'true') !== 'false',
