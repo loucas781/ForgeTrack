@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/css/main.css" />
   <link rel="stylesheet" href="/css/auth.css" />
   <script>!function(){var t=localStorage.getItem("ft-theme")||"system";t!=="system"&&document.documentElement.setAttribute("data-theme",t)}()</script>
+  <script src="/js/app.js"></script>
 </head>
 <body class="auth-page">
   <div class="auth-bg"></div>
@@ -81,11 +82,9 @@
       .then(r => { if (r.status === 200) window.location.href = '/' })
       .catch(() => { /* no session or network error — stay on page */ })
 
-    // Check if open signup is allowed
-    fetch('/api/config', { credentials: 'same-origin' })
-      .then(r => r.json())
-      .then(cfg => {
-        if (cfg.allowSignup === false) {
+    // Load config (gets password policy) then check signup status
+    loadConfig().then(cfg => {
+      if (cfg.allowSignup === false) {
           document.getElementById('signup-form').innerHTML = `
             <div style="text-align:center;padding:16px 0">
               <div style="width:44px;height:44px;border-radius:50%;background:rgba(0,82,204,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
