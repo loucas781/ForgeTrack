@@ -124,7 +124,8 @@
 
     // Inject tab bar as a sibling of page-content so it doesn't scroll
     const appBody = document.querySelector('.app-body')
-    const pageContent = document.getElementById('page-inner')
+    const pageContent = document.getElementById('page-content')
+    const pageInner = document.getElementById('page-inner')
     const tabBar = document.createElement('div')
     tabBar.className = 'settings-tabs-wrap'
     tabBar.innerHTML = `
@@ -138,14 +139,14 @@
       <select class="settings-mobile-select" id="settings-mobile-select">
         ${TABS.map((t,i) => `<option value="${t.id}"${i===0?' selected':''}>${t.label}</option>`).join('')}
       </select>`
-    // Insert tab bar between topbar and page-content (wrapping app-body contents)
+    // Insert tab bar between sidebar and page-content in app-body
     if (appBody && pageContent) {
       // Restructure: app-body → [tab-bar + page-content vertically]
       appBody.style.flexDirection = 'column'
       appBody.insertBefore(tabBar, pageContent)
     }
 
-    const content = document.getElementById('page-inner')
+    const content = pageInner
     const v = config.version || '0.0.1'
     const isDev = v.includes('-dev.'), isRC = v.includes('-rc')
     const base = v.split('-')[0]
