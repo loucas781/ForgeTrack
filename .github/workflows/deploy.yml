@@ -1,19 +1,36 @@
 name: CI / Deploy
 
+# ── HOW THE TRIGGER ORDER WORKS ───────────────────────────────────────────────
+# develop  → push fires deploy directly (version.yml also runs, but independently)
+# staging  → PR merge fires version.yml first (bumps .version, commits to staging)
+#            that commit is a push to staging → fires deploy here with correct version
+# main     → same as staging
+#
+# paths-ignore is intentionally NOT set for staging/main so the version bump
+# commit (chore: bump version …) always triggers a deploy.
+# ─────────────────────────────────────────────────────────────────────────────
+
 on:
   push:
-    branches: [main, staging, develop]
+    branches: [develop, staging, main]
     paths-ignore:
-      - '.version'
-      - 'package.json'
-  pull_request:
-    branches: [main, develop]
+      # Ignore version bump commits on develop only (they're not deployable changes)
+      # For staging/main we WANT to deploy after the version bump commit — see above.
+      # GitHub Actions doesn't support per-branch paths-ignore, so we handle this
+      # in the job conditions below instead.
+      - 'README.md'
 
 jobs:
-  # ── Lint & basic check ────────────────────────────────────────────
-  test:
+  # ── Syntax check ──────────────────────────────────────────────────
+  check:
     name: Check
     runs-on: ubuntu-latest
+
+    # On develop: skip the auto version-bump commit to avoid deploy loops
+    if: |
+      github.ref != 'refs/heads/develop' ||
+      !startsWith(github.event.head_commit.message, 'chore: bump version')
+
     steps:
       - uses: actions/checkout@v4
 
@@ -24,22 +41,40 @@ jobs:
       - name: Install dependencies
         run: npm install --omit=dev --no-audit --no-fund
 
-      - name: Check server starts without error
+      - name: Syntax check
         run: node --check server/index.js
         env:
-          NODE_ENV: staging
+          NODE_ENV: development
           JWT_SECRET: ci-test-secret
 
-  # ── Deploy to develop LXC (develop branch only) ───────────────────
+  # ── Deploy to develop LXC ──────────────────────────────────────────
   # Requires a self-hosted runner on your Proxmox host.
-  # To set up: GitHub repo → Settings → Actions → Runners → New self-hosted runner
-  # Install the runner on pve01, then uncomment the deploy-develop job below.
+  # GitHub repo → Settings → Actions → Runners → New self-hosted runner
+  # Install on pve01, then uncomment below.
   #
   # deploy-develop:
   #   name: Deploy → Develop LXC
-  #   needs: test
-  #   runs-on: self-hosted          # <-- your Proxmox runner
+  #   needs: check
+  #   runs-on: self-hosted
   #   if: github.ref == 'refs/heads/develop'
   #   steps:
-  #     - name: Update container
+  #     - name: Pull latest and restart
   #       run: pct exec ${{ vars.DEV_CTID }} -- bash /opt/forgetrack/update.sh
+
+  # deploy-staging:
+  #   name: Deploy → Staging LXC
+  #   needs: check
+  #   runs-on: self-hosted
+  #   if: github.ref == 'refs/heads/staging'
+  #   steps:
+  #     - name: Pull latest and restart
+  #       run: pct exec ${{ vars.STAGING_CTID }} -- bash /opt/forgetrack/update.sh
+
+  # deploy-production:
+  #   name: Deploy → Production LXC
+  #   needs: check
+  #   runs-on: self-hosted
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Pull latest and restart
+  #       run: pct exec ${{ vars.PROD_CTID }} -- bash /opt/forgetrack/update.sh
