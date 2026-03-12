@@ -14,11 +14,17 @@
       background: var(--surface);
       border-bottom: 1px solid var(--border-2);
       min-width: 0;
+      overflow: hidden;
     }
     .settings-tabs {
       display: flex; gap: 0; overflow-x: auto; scrollbar-width: none;
       padding: 0 16px;
       min-width: 0;
+      /* Prevent the scroll container itself from being draggable/movable */
+      overscroll-behavior-x: contain;
+      touch-action: pan-x;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .settings-tabs::-webkit-scrollbar { display: none; }
     .settings-tab {
@@ -29,10 +35,11 @@
       color: var(--text-2); cursor: pointer; white-space: nowrap;
       transition: color var(--t-fast), border-color var(--t-fast);
       flex-shrink: 0;
+      user-select: none;
     }
     .settings-tab:hover { color: var(--text); }
     .settings-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
-    .settings-tab svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .settings-tab svg { width: 14px; height: 14px; flex-shrink: 0; pointer-events: none; }
     /* Mobile: replace tab bar with a select dropdown */
     .settings-mobile-select {
       display: none;

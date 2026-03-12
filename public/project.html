@@ -56,6 +56,10 @@
 
     // ── Global create issue (wired to topbar button) ──────────────────────────
     document.getElementById('create-issue-btn')?.addEventListener('click', async () => {
+      if (project.is_closed) {
+        showToast('This project is closed — new issues cannot be created.', 'error')
+        return
+      }
       const users = await GET('/users')
       populateSelect(document.getElementById('ci-project'), [project], 'id', 'name')
       document.getElementById('ci-project').value = project.id
