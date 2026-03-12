@@ -411,7 +411,7 @@
     // Wire create issue btn from topbar
     document.getElementById('create-issue-btn')?.addEventListener('click', async () => {
       const projs = await GET('/projects')
-      populateSelect(document.getElementById('ci-project'), projs, 'id', 'name')
+      populateSelect(document.getElementById('ci-project'), projs.filter(p => !p.is_closed), 'id', 'name')
       document.getElementById('ci-project').value = issue.project_id
       populateSelect(document.getElementById('ci-assignee'), users.filter(u => u.role === 'admin' || u.role === 'engineer'), 'id', 'name', 'Unassigned')
       openModal('create-issue-modal')
