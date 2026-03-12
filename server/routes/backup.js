@@ -228,30 +228,28 @@ router.post('/restore', async (req, res) => {
     }
 
     // ── 2. Projects ───────────────────────────────────────────────────────────
-    // Try upsert by id first; fall back to update by key on cross-instance restore.
+    // Insert with lead_id/created_by nulled to avoid FK violations when the
+    // referenced user rows haven't been committed yet or have different IDs.
+    // A patch pass below restores the real values after all users exist.
     for (const p of (tables.projects || [])) {
-      const params = [
-        p.id, p.key, p.name, p.description || null,
-        p.lead_id || null, p.created_by || null,
-        p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
-        p.icon || null, p.created_at,
-      ]
       const { err } = await sp(() => client.query(`
         INSERT INTO projects (id, key, name, description, lead_id, created_by, color, archived, is_closed, icon, created_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        VALUES ($1,$2,$3,$4,NULL,NULL,$5,$6,$7,$8,$9)
         ON CONFLICT (id) DO UPDATE SET
-          key=$2, name=$3, description=$4, lead_id=$5, created_by=$6,
-          color=$7, archived=$8, is_closed=$9, icon=$10
-      `, params))
+          key=$2, name=$3, description=$4,
+          color=$5, archived=$6, is_closed=$7, icon=$8
+      `, [
+        p.id, p.key, p.name, p.description || null,
+        p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
+        p.icon || null, p.created_at,
+      ]))
       if (err) {
         if (err.constraint === 'projects_key_key') {
           const { err: fbErr } = await sp(() => client.query(`
             UPDATE projects SET
-              name=$1, description=$2, lead_id=$3, created_by=$4,
-              color=$5, archived=$6, is_closed=$7, icon=$8
-            WHERE key=$9
+              name=$1, description=$2, color=$3, archived=$4, is_closed=$5, icon=$6
+            WHERE key=$7
           `, [p.name, p.description || null,
-              p.lead_id || null, p.created_by || null,
               p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
               p.icon || null, p.key]))
           if (fbErr) throw fbErr
@@ -270,19 +268,18 @@ router.post('/restore', async (req, res) => {
     }
 
     // ── 4. Issues ─────────────────────────────────────────────────────────────
+    // Insert with assignee_id/reporter_id nulled — patched after all users exist.
     for (const i of (tables.issues || [])) {
       await sp(() => client.query(`
         INSERT INTO issues (id, key, project_id, title, description, type, status, priority,
                             assignee_id, reporter_id, story_points, due_date, created_at, updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL,NULL,$9,$10,$11,$12)
         ON CONFLICT (id) DO UPDATE SET
           key=$2, project_id=$3, title=$4, description=$5, type=$6, status=$7,
-          priority=$8, assignee_id=$9, reporter_id=$10, story_points=$11,
-          due_date=$12, updated_at=$14
+          priority=$8, story_points=$9, due_date=$10, updated_at=$12
       `, [
         i.id, i.key, i.project_id, i.title, i.description || null,
         i.type || 'task', i.status || 'todo', i.priority || 'medium',
-        i.assignee_id || null, i.reporter_id || null,
         i.story_points || null, i.due_date || null,
         i.created_at, i.updated_at || i.created_at,
       ]))
@@ -329,6 +326,31 @@ router.post('/restore', async (req, res) => {
         ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()
       `, [p.key, p.value]))
       stats.preferences++
+    }
+
+    // ── 9. FK patch pass ──────────────────────────────────────────────────────
+    // Now that all users, projects, and issues exist, restore the FK columns
+    // that were intentionally nulled during initial insert to avoid ordering
+    // violations. Only update rows where the referenced id actually exists.
+    for (const p of (tables.projects || [])) {
+      if (p.lead_id || p.created_by) {
+        await sp(() => client.query(`
+          UPDATE projects SET
+            lead_id    = CASE WHEN EXISTS(SELECT 1 FROM users WHERE id=$2) THEN $2 ELSE NULL END,
+            created_by = CASE WHEN EXISTS(SELECT 1 FROM users WHERE id=$3) THEN $3 ELSE NULL END
+          WHERE id=$1
+        `, [p.id, p.lead_id || null, p.created_by || null]))
+      }
+    }
+    for (const i of (tables.issues || [])) {
+      if (i.assignee_id || i.reporter_id) {
+        await sp(() => client.query(`
+          UPDATE issues SET
+            assignee_id = CASE WHEN EXISTS(SELECT 1 FROM users WHERE id=$2) THEN $2 ELSE NULL END,
+            reporter_id = CASE WHEN EXISTS(SELECT 1 FROM users WHERE id=$3) THEN $3 ELSE NULL END
+          WHERE id=$1
+        `, [i.id, i.assignee_id || null, i.reporter_id || null]))
+      }
     }
 
     await client.query('COMMIT')
