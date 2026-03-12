@@ -87,7 +87,7 @@
     // ── Create project btn ────────────────────────────────────────────────────
     document.getElementById('create-project-btn')?.addEventListener('click', async () => {
       const users = await GET('/users')
-      populateSelect(document.getElementById('cp-lead'), users, 'id', 'name', '— Select lead —')
+      populateSelect(document.getElementById('cp-lead'), users.filter(u => u.role === 'admin' || u.role === 'lead'), 'id', 'name', '— Select lead —')
       renderColorPicker(document.getElementById('cp-colors'), PROJECT_COLORS, '#0052cc', v => document.getElementById('cp-color').value = v)
       openModal('create-project-modal')
     })
@@ -255,7 +255,7 @@
                 <label class="form-label">Project Lead</label>
                 <select class="form-control" id="ps-lead">
                   <option value="">— None —</option>
-                  ${users.map(u => `<option value="${u.id}"${u.id===project.lead_id?' selected':''}>${esc(u.name)}</option>`).join('')}
+                  ${users.filter(u => u.role === 'admin' || u.role === 'lead').map(u => `<option value="${u.id}"${u.id===project.lead_id?' selected':''}>${esc(u.name)}</option>`).join('')}
                 </select>
               </div>
             </div>

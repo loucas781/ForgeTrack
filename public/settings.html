@@ -200,6 +200,7 @@
               <label class="form-label">Role</label>
               <select class="form-control" id="invite-role">
                 <option value="member">Member</option>
+                <option value="engineer">Engineer</option>
                 <option value="lead">Project Lead</option>
                 <option value="admin">Admin</option>
               </select>
@@ -209,36 +210,69 @@
           <div id="invite-result" style="display:none;margin-top:12px;padding:12px 14px;border-radius:var(--r-md);font-size:13px"></div>
         </div>` : ''}
         <div class="card section-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <h3 class="section-title" style="margin:0">Members (${users.length})</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <h3 class="section-title" style="margin:0">Team Members (${users.length})</h3>
             ${config.allowSignup ? `<span class="text-3 text-sm">Open signup: <a href="/signup.html" style="color:var(--brand)">/signup.html</a></span>` : `<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">Signup disabled</span>`}
           </div>
-          ${users.map(u => `
-            <div class="member-row" id="member-row-${u.id}">
-              <div class="member-row-info">
-                ${avatarHtml(u, 36)}
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                    ${esc(u.name)}
-                    ${u.id === me?.id ? `<span class="role-badge">you</span>` : ''}
-                    ${!u.is_active ? `<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">inactive</span>` : ''}
+          ${(function() {
+            // Helper to render a single member row
+            function memberRow(u) {
+              return `
+                <div class="member-row" id="member-row-${u.id}">
+                  <div class="member-row-info">
+                    ${avatarHtml(u, 36)}
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        ${esc(u.name)}
+                        ${u.id === me?.id ? `<span class="role-badge">you</span>` : ''}
+                        ${!u.is_active ? `<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">inactive</span>` : ''}
+                      </div>
+                      <div class="text-3 text-sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.email)}</div>
+                    </div>
                   </div>
-                  <div class="text-3 text-sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.email)}</div>
-                </div>
-                <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:${u.role==='admin'?'rgba(0,82,204,.1)':u.role==='lead'?'rgba(101,84,192,.1)':'var(--gray-100)'};color:${u.role==='admin'?'var(--brand)':u.role==='lead'?'#6554c0':'var(--text-2)'};flex-shrink:0;white-space:nowrap">${u.role==='lead'?'Project Lead':esc(u.role)}</span>
-              </div>
-              ${isAdmin && u.id !== me?.id ? `
-              <div class="member-actions">
-                <button class="btn btn-sm" onclick="changeRoleModal('${u.id}','${esc(u.name)}','${u.role}')">Change Role</button>
-                <button class="btn btn-sm" onclick="setPasswordModal('${u.id}','${esc(u.name)}')">Set Password</button>
-                <button class="btn btn-sm" onclick="getResetLink('${u.id}','${esc(u.name)}')">Reset Link</button>
-                ${u.is_active
-                  ? `<button class="btn btn-sm" style="color:var(--orange)" onclick="toggleActive('${u.id}', false)">Deactivate</button>`
-                  : `<button class="btn btn-sm" style="color:var(--green)" onclick="toggleActive('${u.id}', true)">Reactivate</button>`
-                }
-                <button class="btn btn-sm" style="color:var(--red,#de350b)" onclick="deleteUser('${u.id}','${esc(u.name)}')">Delete</button>
-              </div>` : ''}
-            </div>`).join('')}
+                  ${isAdmin && u.id !== me?.id ? `
+                  <div class="member-actions">
+                    <button class="btn btn-sm" onclick="changeRoleModal('${u.id}','${esc(u.name)}','${u.role}')">Change Role</button>
+                    <button class="btn btn-sm" onclick="setPasswordModal('${u.id}','${esc(u.name)}')">Set Password</button>
+                    <button class="btn btn-sm" onclick="getResetLink('${u.id}','${esc(u.name)}')">Reset Link</button>
+                    ${u.is_active
+                      ? `<button class="btn btn-sm" style="color:var(--orange)" onclick="toggleActive('${u.id}', false)">Deactivate</button>`
+                      : `<button class="btn btn-sm" style="color:var(--green)" onclick="toggleActive('${u.id}', true)">Reactivate</button>`
+                    }
+                    <button class="btn btn-sm" style="color:var(--red,#de350b)" onclick="deleteUser('${u.id}','${esc(u.name)}')">Delete</button>
+                  </div>` : ''}
+                </div>`
+            }
+
+            // Group users by role in display order
+            const ROLE_GROUPS = [
+              { role: 'admin',    label: 'Administrators',  desc: 'Full access to all settings and projects',                     color: 'var(--brand)',         bg: 'rgba(0,82,204,.08)',    icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+              { role: 'lead',     label: 'Project Leads',   desc: 'Manage projects and issues in projects they lead',             color: '#6554c0',              bg: 'rgba(101,84,192,.08)',  icon: '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/><path d="M12 12l2 4-2 1-2-1 2-4z"/>' },
+              { role: 'engineer', label: 'Engineers',       desc: 'Create and work on issues, claim and reassign tickets',        color: 'var(--green,#00875a)', bg: 'rgba(0,135,90,.08)',   icon: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>' },
+              { role: 'member',   label: 'Members',         desc: 'View projects, create issues and leave comments',              color: 'var(--text-2)',        bg: 'var(--gray-100)',       icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+            ]
+
+            let html = ''
+            ROLE_GROUPS.forEach(group => {
+              const groupUsers = users.filter(u => u.role === group.role)
+              if (!groupUsers.length) return
+
+              html += `
+                <div class="team-role-section" style="margin-bottom:24px">
+                  <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:2px solid var(--border-2);margin-bottom:12px">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:${group.bg};flex-shrink:0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="${group.color}" stroke-width="2" viewBox="0 0 24 24">${group.icon}</svg>
+                    </span>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:13px;font-weight:700;color:${group.color}">${group.label} <span style="font-weight:400;color:var(--text-3)">(${groupUsers.length})</span></div>
+                      <div style="font-size:11px;color:var(--text-3);margin-top:1px">${group.desc}</div>
+                    </div>
+                  </div>
+                  ${groupUsers.map(u => memberRow(u)).join('')}
+                </div>`
+            })
+            return html
+          })()}
         </div>
       </div>
 
@@ -680,7 +714,7 @@
     function changeRoleModal(userId, name, currentRole) {
       const existing = document.getElementById('change-role-modal')
       if (existing) existing.remove()
-      const ROLE_LABELS = { member: 'Member', lead: 'Project Lead', admin: 'Admin' }
+      const ROLE_LABELS = { member: 'Member', engineer: 'Engineer', lead: 'Project Lead', admin: 'Admin' }
       const modal = document.createElement('div')
       modal.className = 'modal-overlay'
       modal.id = 'change-role-modal'
@@ -692,6 +726,7 @@
             <label class="form-label">Role</label>
             <select class="form-control" id="change-role-select">
               <option value="member"${currentRole==='member'?' selected':''}>Member — can view projects, create &amp; comment on issues</option>
+              <option value="engineer"${currentRole==='engineer'?' selected':''}>Engineer — create & work issues, claim unassigned tickets, reassign to self</option>
               <option value="lead"${currentRole==='lead'?' selected':''}>Project Lead — can create projects and manage issues in projects they lead</option>
               <option value="admin"${currentRole==='admin'?' selected':''}>Admin — full access to everything</option>
             </select>

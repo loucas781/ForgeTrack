@@ -313,7 +313,7 @@ router.post('/invite', requireAuth, async (req, res) => {
 
     await db.query(
       `INSERT INTO users (id, name, email, password, initials, color, role) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [id, name.trim(), norm, hash, getInitials(name), COLORS[colorIdx], ['admin','lead','member'].includes(role) ? role : 'member']
+      [id, name.trim(), norm, hash, getInitials(name), COLORS[colorIdx], ['admin','lead','member','engineer'].includes(role) ? role : 'member']
     )
 
     const origin = process.env.APP_URL || ''

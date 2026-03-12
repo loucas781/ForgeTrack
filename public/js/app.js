@@ -115,7 +115,7 @@ function updatePasswordIndicator(wrap, value) {
 }
 
 // Role rank helper — mirrors server/permissions.js
-const ROLE_RANK = { member: 0, lead: 1, admin: 2 }
+const ROLE_RANK = { member: 0, engineer: 1, lead: 2, admin: 3 }
 function userRank(role) { return ROLE_RANK[role] ?? 0 }
 
 /**
@@ -136,6 +136,14 @@ function userCanManageProject(proj) {
   if (APP_CONFIG.user.role === 'admin') return true
   if (APP_CONFIG.user.role === 'lead' && proj?.lead_id === APP_CONFIG.user.id) return true
   return false
+}
+
+/**
+ * True if the current user may set/update the assignee on an issue.
+ * Engineers (and above) can claim issues. Mirrors server canClaimIssue().
+ */
+function userCanClaimIssue() {
+  return userCan('engineer')
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -392,8 +400,8 @@ async function initTopbar() {
     searchInput.addEventListener('keydown', e => { if (e.key === 'Escape') { searchResults.classList.remove('show'); searchInput.blur() } })
   }
 
-  // Hide "New Project" from the Create menu for plain members
-  if (user?.role === 'member') {
+  // Hide "New Project" from the Create menu for plain members and engineers
+  if (user?.role === 'member' || user?.role === 'engineer') {
     document.getElementById('create-project-btn')?.remove()
     document.getElementById('proj-menu-new')?.remove()
   }

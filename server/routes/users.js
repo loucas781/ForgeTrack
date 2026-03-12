@@ -44,7 +44,7 @@ router.patch('/:id', async (req, res) => {
     const vals    = []
     if (is_active !== undefined) { updates.push(`is_active = $${vals.length + 1}`); vals.push(is_active) }
     if (role      !== undefined) {
-      if (!['member','lead','admin'].includes(role)) return res.status(400).json({ error: 'Invalid role.' })
+      if (!['member','engineer','lead','admin'].includes(role)) return res.status(400).json({ error: 'Invalid role.' })
       updates.push(`role = $${vals.length + 1}`)
       vals.push(role)
     }

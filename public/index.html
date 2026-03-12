@@ -126,7 +126,7 @@
     async function openCreateProject() {
       const users = await GET('/users')
       const leadSel = document.getElementById('cp-lead')
-      populateSelect(leadSel, users, 'id', 'name', '— Select lead —')
+      populateSelect(leadSel, users.filter(u => u.role === 'admin' || u.role === 'lead'), 'id', 'name', '— Select lead —')
       renderColorPicker(document.getElementById('cp-colors'), PROJECT_COLORS, '#0052cc', v => document.getElementById('cp-color').value = v)
       document.getElementById('cp-name').value = ''
       document.getElementById('cp-key').value  = ''
