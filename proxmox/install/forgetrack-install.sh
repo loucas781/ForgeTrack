@@ -139,13 +139,26 @@ msg_ok "ForgeTrack service started"
 cat > /opt/forgetrack/update.sh << 'UPDATEEOF'
 #!/usr/bin/env bash
 set -e; cd /opt/forgetrack
+
+# Detect APP_ENV from whichever .env.* file exists (production > staging > development)
+if   [[ -f .env.production  ]]; then APP_ENV=production
+elif [[ -f .env.staging      ]]; then APP_ENV=staging
+else                                   APP_ENV=development
+fi
+
+# Extract DATABASE_URL so the migration can always connect without a password prompt
+DB_URL=$(grep -E '^DATABASE_URL=' ".env.${APP_ENV}" 2>/dev/null | cut -d= -f2-)
+if [[ -z "$DB_URL" ]]; then
+  echo "ERROR: Could not read DATABASE_URL from .env.${APP_ENV}" >&2; exit 1
+fi
+
 # Keep .env files safe — git must never overwrite them
 echo ".env.*" >> .git/info/exclude 2>/dev/null || true
 git fetch origin
 git reset --hard origin/develop
 mkdir -p /tmp/npm-cache
 HOME=/root npm install --omit=dev --cache /tmp/npm-cache --unsafe-perm --no-audit --no-fund
-HOME=/root NODE_ENV=${APP_ENV} node server/db/migrate.js
+HOME=/root NODE_ENV=${APP_ENV} DATABASE_URL="${DB_URL}" node server/db/migrate.js
 systemctl restart forgetrack
 echo "✓ ForgeTrack updated to $(cat .version)"
 UPDATEEOF

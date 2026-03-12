@@ -78,10 +78,12 @@
       document.getElementById('ci-project').value = project.id
       const users = await GET('/users')
       populateSelect(document.getElementById('ci-assignee'), users, 'id', 'name', 'Unassigned')
+      await applyCreateIssuePrefs()
       openModal('create-issue-modal')
     })
     document.getElementById('create-issue-form')?.addEventListener('submit', async e => {
       e.preventDefault()
+      if (!validateCreateIssuePrefs()) return
       try {
         const iss = await POST('/issues', { project_id: document.getElementById('ci-project').value, title: document.getElementById('ci-title').value.trim(), description: document.getElementById('ci-desc').value.trim(), type: document.getElementById('ci-type').value, status: document.getElementById('ci-status').value, priority: document.getElementById('ci-priority').value, assignee_id: document.getElementById('ci-assignee').value||null, story_points: parseInt(document.getElementById('ci-points').value)||null, due_date: document.getElementById('ci-due').value||null, labels: document.getElementById('ci-labels').value.split(',').map(l=>l.trim()).filter(Boolean) })
         closeModal('create-issue-modal')

@@ -314,6 +314,62 @@ app.post('/api/config/email/test', requireAuth, async (req, res) => {
   res.json({ ok: true, sentTo: me.email })
 })
 
+// ── GET /api/version/check — admin: check GitHub for latest release ──────────
+app.get('/api/version/check', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  try {
+    const https = require('https')
+    const latest = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'api.github.com',
+        path: '/repos/loucas781/ForgeTrack/releases/latest',
+        headers: { 'User-Agent': 'ForgeTrack-self-update-check/1.0' },
+        timeout: 5000,
+      }
+      const req2 = https.get(options, r => {
+        let data = ''
+        r.on('data', chunk => data += chunk)
+        r.on('end', () => {
+          try { resolve(JSON.parse(data)) } catch { reject(new Error('Parse error')) }
+        })
+      })
+      req2.on('error', reject)
+      req2.on('timeout', () => { req2.destroy(); reject(new Error('Timeout')) })
+    })
+    if (!latest || latest.message === 'Not Found' || !latest.tag_name) {
+      return res.json({ upToDate: true, current: APP_VERSION, latest: null })
+    }
+    // Strip leading 'v' from tag (e.g. v0.1.0 → 0.1.0) for comparison
+    const latestVersion = latest.tag_name.replace(/^v/, '')
+    // Strip pre-release suffixes for comparison
+    const currentBase = APP_VERSION.replace(/-(dev|rc).*$/, '')
+    const latestBase  = latestVersion.replace(/-(dev|rc).*$/, '')
+    const upToDate = currentBase === latestBase || semverGte(currentBase, latestBase)
+    res.json({
+      upToDate,
+      current: APP_VERSION,
+      latest:  latestVersion,
+      releaseUrl: latest.html_url,
+      publishedAt: latest.published_at,
+    })
+  } catch (err) {
+    // Network failures are non-fatal — return graceful response
+    res.json({ upToDate: true, current: APP_VERSION, latest: null, error: err.message })
+  }
+})
+
+// Simple semver >= comparison (major.minor.patch only)
+function semverGte(a, b) {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0)
+    if (diff > 0) return true
+    if (diff < 0) return false
+  }
+  return true
+}
+
 // ── GET /api/preferences — read app preferences ───────────────────────────────
 app.get('/api/preferences', requireAuth, async (req, res) => {
   try {

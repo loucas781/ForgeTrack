@@ -72,6 +72,27 @@ function buildTopbarHTML() {
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
 
+        <!-- Update available notification (admin only, shown when update detected) -->
+        <div class="dropdown" id="update-notif-wrap" style="display:none">
+          <button class="topbar-icon-btn" id="update-notif-btn" title="Update available"
+            onclick="toggleDropdown(document.getElementById('update-notif-menu'))"
+            style="position:relative;color:#ffab00">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+            <span style="position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ff5630;border-radius:50%;border:2px solid var(--topbar-bg)"></span>
+          </button>
+          <div class="dropdown-menu dropdown-menu-r" id="update-notif-menu" style="min-width:280px;padding:16px">
+            <p style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--text);display:flex;align-items:center;gap:6px">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="#ffab00" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              Update Available
+            </p>
+            <p style="font-size:12px;color:var(--text-2);margin-bottom:12px" id="update-notif-desc">A new version of ForgeTrack is available.</p>
+            <a id="update-notif-link" href="https://github.com/loucas781/ForgeTrack/releases" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center;font-size:12px">
+              View Release Notes
+            </a>
+            <p style="font-size:11px;color:var(--text-3);margin-top:10px">Run <code style="background:var(--gray-100);padding:1px 4px;border-radius:3px">update.sh</code> on your server to update.</p>
+          </div>
+        </div>
+
         <!-- Theme toggle -->
         <div class="dropdown" id="theme-dropdown-wrap" style="position:relative">
           <button class="theme-toggle-btn" id="theme-toggle-btn" title="Change theme">
@@ -242,10 +263,10 @@ function injectShell(opts = {}) {
     <div id="mobile-search-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:300;padding:12px;flex-direction:column;gap:8px">
       <div style="display:flex;gap:8px;align-items:center">
         <div style="position:relative;flex:1">
-          <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.4);pointer-events:none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-          <input class="topbar-search-input" type="text" id="mobile-search-input" placeholder="Search issues…" autocomplete="off" style="width:100%" autofocus />
+          <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-3);pointer-events:none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input class="mobile-search-field form-control" type="text" id="mobile-search-input" placeholder="Search issues…" autocomplete="off" style="width:100%;padding-left:32px" autofocus />
         </div>
-        <button class="btn btn-ghost" id="mobile-search-close" style="color:rgba(255,255,255,.7);flex-shrink:0">Cancel</button>
+        <button class="btn btn-ghost" id="mobile-search-close" style="color:var(--text-2);flex-shrink:0">Cancel</button>
       </div>
       <div id="mobile-search-results" style="background:var(--surface);border-radius:var(--r-lg);overflow:hidden;display:none"></div>
     </div>
@@ -426,11 +447,11 @@ function globalModalsHTML() {
             </div>
             <div class="form-grid-2">
               <div class="form-group">
-                <label class="form-label">Assignee</label>
+                <label class="form-label" id="ci-assignee-label">Assignee</label>
                 <select class="form-control" id="ci-assignee"></select>
               </div>
               <div class="form-group">
-                <label class="form-label">Due Date</label>
+                <label class="form-label" id="ci-due-label">Due Date</label>
                 <input class="form-control" type="date" id="ci-due" />
               </div>
             </div>
