@@ -8,14 +8,42 @@
 const path = require('path')
 const fs   = require('fs')
 
-// Load env file
-const env     = process.env.NODE_ENV || 'development'
-const envFile = path.join(__dirname, '../../', `.env.${env}`)
-if (fs.existsSync(envFile)) {
-  fs.readFileSync(envFile, 'utf8').split('\n').forEach(line => {
+// ── Load env file ─────────────────────────────────────────────────────────────
+// Try NODE_ENV first, then fall back through all known env files so the
+// migration always finds credentials regardless of how it was invoked.
+const root = path.join(__dirname, '../../')
+
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return false
+  fs.readFileSync(filePath, 'utf8').split('\n').forEach(line => {
     const [k, ...v] = line.split('=')
-    if (k && !k.startsWith('#') && v.length) process.env[k.trim()] = v.join('=').trim()
+    if (k && !k.startsWith('#') && v.length) {
+      const key = k.trim()
+      // Don't overwrite vars already set on the process (e.g. passed explicitly)
+      if (!process.env[key]) process.env[key] = v.join('=').trim()
+    }
   })
+  return true
+}
+
+// 1. Prefer whatever the caller explicitly set as NODE_ENV
+const explicitEnv = process.env.NODE_ENV
+if (explicitEnv) {
+  loadEnvFile(path.join(root, `.env.${explicitEnv}`))
+}
+
+// 2. If DATABASE_URL still isn't set, try each env file in priority order
+if (!process.env.DATABASE_URL) {
+  for (const e of ['production', 'staging', 'development']) {
+    if (loadEnvFile(path.join(root, `.env.${e}`)) && process.env.DATABASE_URL) break
+  }
+}
+
+// 3. Hard-fail with a clear message rather than letting pg throw a cryptic SASL error
+if (!process.env.DATABASE_URL || typeof process.env.DATABASE_URL !== 'string') {
+  console.error('Migration failed: DATABASE_URL is not set.')
+  console.error('Looked for .env.production / .env.staging / .env.development in', root)
+  process.exit(1)
 }
 
 const { Pool } = require('pg')
