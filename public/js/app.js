@@ -251,7 +251,16 @@ function toggleDropdown(menuEl) {
 
 // ─── Modal helpers ────────────────────────────────────────────────────────────
 function openModal(id)  { document.getElementById(id)?.classList.remove('hidden') }
-function closeModal(id) { document.getElementById(id)?.classList.add('hidden') }
+function closeModal(id) {
+  document.getElementById(id)?.classList.add('hidden')
+  // Reset user-change tracking on the create issue modal so defaults re-apply next open
+  if (id === 'create-issue-modal') {
+    const typeSel     = document.getElementById('ci-type')
+    const prioritySel = document.getElementById('ci-priority')
+    if (typeSel)     delete typeSel.dataset.userChanged
+    if (prioritySel) delete prioritySel.dataset.userChanged
+  }
+}
 document.addEventListener('click', e => {
   if (e.target.classList.contains('modal-backdrop')) {
     e.target.classList.add('hidden')
@@ -406,6 +415,26 @@ async function initTopbar() {
     document.getElementById('proj-menu-new')?.remove()
   }
 
+  // Version update check — admin only, once per session
+  if (user?.role === 'admin') {
+    const updateWrap = document.getElementById('update-notif-wrap')
+    if (updateWrap) {
+      // Don't block page load — fire and forget
+      ;(async () => {
+        try {
+          const data = await GET('/version/check')
+          if (data && !data.upToDate && data.latest) {
+            const desc = document.getElementById('update-notif-desc')
+            const link = document.getElementById('update-notif-link')
+            if (desc) desc.textContent = `Version ${data.latest} is available (you're on ${data.current}).`
+            if (link && data.releaseUrl) link.href = data.releaseUrl
+            updateWrap.style.display = ''
+          }
+        } catch (_) { /* non-fatal — silently ignore network errors */ }
+      })()
+    }
+  }
+
   initAttachmentPicker()
 }
 
@@ -554,4 +583,78 @@ async function uploadPendingAttachments(issueId) {
   input._files = []
   const preview = document.getElementById('ci-attach-preview')
   if (preview) preview.innerHTML = ''
+}
+
+// Apply preference-based required field enforcement to the create issue modal.
+// Call this each time the create issue modal is opened (after populating assignee list).
+async function applyCreateIssuePrefs() {
+  try {
+    const prefs = await GET('/preferences')
+    const assigneeLabel = document.getElementById('ci-assignee-label')
+    const dueLabel      = document.getElementById('ci-due-label')
+    const assigneeSel   = document.getElementById('ci-assignee')
+    const dueInput      = document.getElementById('ci-due')
+    const typeSel       = document.getElementById('ci-type')
+    const prioritySel   = document.getElementById('ci-priority')
+
+    // ── Required field markers ───────────────────────────────────────
+    if (assigneeLabel && assigneeSel) {
+      if (prefs.require_assignee) {
+        assigneeLabel.innerHTML = 'Assignee <span class="req-star" style="color:var(--red);margin-left:2px">*</span>'
+        assigneeSel.setAttribute('data-require-assignee', '1')
+      } else {
+        assigneeLabel.innerHTML = 'Assignee'
+        assigneeSel.removeAttribute('data-require-assignee')
+      }
+    }
+    if (dueLabel && dueInput) {
+      if (prefs.require_due_date) {
+        dueLabel.innerHTML = 'Due Date <span class="req-star" style="color:var(--red);margin-left:2px">*</span>'
+        dueInput.setAttribute('data-require-due', '1')
+      } else {
+        dueLabel.innerHTML = 'Due Date'
+        dueInput.removeAttribute('data-require-due')
+      }
+    }
+
+    // ── Default type ─────────────────────────────────────────────────
+    if (typeSel && prefs.default_issue_type) {
+      // Only apply the default if the user hasn't already changed it
+      // (i.e. it's still on the first/default option). We check against
+      // 'task' since that's the hardcoded modal default.
+      if (!typeSel.dataset.userChanged) {
+        typeSel.value = prefs.default_issue_type
+      }
+    }
+
+    // ── Default priority ─────────────────────────────────────────────
+    if (prioritySel && prefs.default_priority) {
+      if (!prioritySel.dataset.userChanged) {
+        prioritySel.value = prefs.default_priority
+      }
+    }
+
+    // Track user changes so we don't clobber them if the modal stays open
+    typeSel?.addEventListener('change', () => { typeSel.dataset.userChanged = '1' }, { once: true })
+    prioritySel?.addEventListener('change', () => { prioritySel.dataset.userChanged = '1' }, { once: true })
+
+  } catch (_) { /* non-fatal — backend will still validate */ }
+}
+
+// Validate preference-required fields before create issue form submission.
+// Returns true if valid, false if the user should be blocked (shows toast).
+function validateCreateIssuePrefs() {
+  const assigneeSel = document.getElementById('ci-assignee')
+  const dueInput    = document.getElementById('ci-due')
+  if (assigneeSel?.getAttribute('data-require-assignee') && !assigneeSel.value) {
+    toast('An assignee is required for new issues.', 'error')
+    assigneeSel.focus()
+    return false
+  }
+  if (dueInput?.getAttribute('data-require-due') && !dueInput.value) {
+    toast('A due date is required for new issues.', 'error')
+    dueInput.focus()
+    return false
+  }
+  return true
 }

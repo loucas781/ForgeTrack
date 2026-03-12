@@ -1521,12 +1521,12 @@
         const prefs = await GET('/preferences')
         card.innerHTML = `
           <h3 class="section-title" style="margin-bottom:4px">Project & Issue Defaults</h3>
-          <p class="text-2 text-sm" style="margin-bottom:20px">These settings control default behaviour across the application.</p>
+          <p class="text-2 text-sm" style="margin-bottom:20px">These settings control default behaviour across the application. Changes take effect immediately after saving.</p>
 
           <div class="pref-row">
             <div class="pref-row-info">
               <strong>Show only my projects in dashboard</strong>
-              <span>When enabled, the dashboard defaults to showing only projects created by or assigned to each user. Admins always see all projects.</span>
+              <span>When enabled, non-admin users only see projects they created or lead on the dashboard. Admins always see all projects. <em style="color:var(--brand)">Active: a filter banner will appear on the dashboard for affected users.</em></span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="pref-myprojects" ${prefs.show_my_projects_only ? 'checked' : ''} />
@@ -1537,7 +1537,7 @@
           <div class="pref-row">
             <div class="pref-row-info">
               <strong>Require issue due date</strong>
-              <span>Makes the due date field required when creating new issues.</span>
+              <span>Makes the due date field mandatory when creating new issues. <em style="color:var(--brand)">Active: the Due Date field shows a red <strong>*</strong> and submission is blocked until a date is set.</em></span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="pref-requiredue" ${prefs.require_due_date ? 'checked' : ''} />
@@ -1548,7 +1548,7 @@
           <div class="pref-row">
             <div class="pref-row-info">
               <strong>Require assignee on new issues</strong>
-              <span>Prevents issues from being created without an assignee.</span>
+              <span>Prevents issues from being created without an assignee. <em style="color:var(--brand)">Active: the Assignee field shows a red <strong>*</strong> and submission is blocked until someone is assigned.</em></span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="pref-requireassignee" ${prefs.require_assignee ? 'checked' : ''} />
@@ -1559,7 +1559,7 @@
           <div class="pref-row">
             <div class="pref-row-info">
               <strong>Default issue type</strong>
-              <span>Pre-selected type when opening the create issue form.</span>
+              <span>Pre-selects this type in the Create Issue form. <em style="color:var(--brand)">Active: the Type dropdown opens with this value pre-selected.</em></span>
             </div>
             <select class="form-control" id="pref-defaulttype" style="width:140px;flex-shrink:0">
               ${['task','bug','story','epic'].map(t => `<option value="${t}"${(prefs.default_issue_type||'task')===t?' selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
@@ -1569,22 +1569,11 @@
           <div class="pref-row">
             <div class="pref-row-info">
               <strong>Default issue priority</strong>
-              <span>Pre-selected priority when opening the create issue form.</span>
+              <span>Pre-selects this priority in the Create Issue form. <em style="color:var(--brand)">Active: the Priority dropdown opens with this value pre-selected.</em></span>
             </div>
             <select class="form-control" id="pref-defaultpriority" style="width:140px;flex-shrink:0">
               ${['critical','high','medium','low','trivial'].map(p => `<option value="${p}"${(prefs.default_priority||'medium')===p?' selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
             </select>
-          </div>
-
-          <div class="pref-row">
-            <div class="pref-row-info">
-              <strong>Allow members to create projects</strong>
-              <span>When disabled, only Admins and Project Leads can create new projects.</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="pref-membercreateproj" ${prefs.members_can_create_projects !== false ? 'checked' : ''} />
-              <span class="toggle-slider"></span>
-            </label>
           </div>
 
           <div style="margin-top:20px;display:flex;align-items:center;gap:12px">
@@ -1600,7 +1589,6 @@
               require_assignee:          document.getElementById('pref-requireassignee').checked,
               default_issue_type:        document.getElementById('pref-defaulttype').value,
               default_priority:          document.getElementById('pref-defaultpriority').value,
-              members_can_create_projects: document.getElementById('pref-membercreateproj').checked,
             })
             const saved = document.getElementById('pref-saved')
             saved.style.display = 'inline'

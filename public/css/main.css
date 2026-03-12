@@ -644,6 +644,24 @@ select.form-control {
   .topbar-search-open .topbar-search-icon {
     color: var(--text-3) !important;
   }
+
+  /* Mobile search overlay input — always uses theme colours (not topbar white-on-dark) */
+  .mobile-search-field {
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+    -webkit-text-fill-color: var(--text) !important;
+  }
+  .mobile-search-field::placeholder {
+    color: var(--text-3) !important;
+    -webkit-text-fill-color: var(--text-3) !important;
+    opacity: 1;
+  }
+  .mobile-search-field:focus {
+    background: var(--surface) !important;
+    border-color: var(--brand) !important;
+    color: var(--text) !important;
+  }
   /* Search results in mobile overlay — ensure readable text */
   .topbar-search-open .search-results {
     color: var(--text);

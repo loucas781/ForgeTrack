@@ -52,6 +52,12 @@
           </button>` : ''}
         </div>
 
+        ${filterMine ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:var(--brand-light);border:1px solid rgba(0,82,204,.2);border-radius:var(--r-md);font-size:13px;color:var(--brand)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          Showing only your projects. Admins can change this in <a href="/settings.html#preferences" style="color:var(--brand);text-decoration:underline">Settings → Preferences</a>.
+        </div>` : ''}
+
         <!-- Stats -->
         <div class="stats-row">
           <div class="card stat-card"><div class="stat-value">${stats.total}</div><div class="stat-label">Total Issues</div></div>
@@ -177,10 +183,12 @@
       const asgn = document.getElementById('ci-assignee')
       // Only engineers and admins are assignable
       populateSelect(asgn, users.filter(u => u.role === 'admin' || u.role === 'engineer'), 'id', 'name', 'Unassigned')
+      await applyCreateIssuePrefs()
       openModal('create-issue-modal')
     })
     document.getElementById('create-issue-form')?.addEventListener('submit', async e => {
       e.preventDefault()
+      if (!validateCreateIssuePrefs()) return
       try {
         const issue = await POST('/issues', {
           project_id:   document.getElementById('ci-project').value,

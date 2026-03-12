@@ -96,6 +96,16 @@ router.post('/', async (req, res) => {
     if (!project_id || !title?.trim())
       return res.status(400).json({ error: 'project_id and title are required.' })
 
+    // Check app preferences for required fields
+    const prefDb = require('../db/connection')
+    const { rows: prefRows } = await prefDb.query('SELECT key, value FROM app_preferences WHERE key IN ($1,$2)', ['require_assignee', 'require_due_date'])
+    const prefMap = {}
+    prefRows.forEach(r => { try { prefMap[r.key] = JSON.parse(r.value) } catch { prefMap[r.key] = r.value } })
+    if (prefMap.require_assignee && !assignee_id)
+      return res.status(400).json({ error: 'An assignee is required for new issues.' })
+    if (prefMap.require_due_date && !due_date)
+      return res.status(400).json({ error: 'A due date is required for new issues.' })
+
     const { rows: projects } = await db.query('SELECT id, key, is_closed FROM projects WHERE id = $1', [project_id])
     if (!projects.length) return res.status(404).json({ error: 'Project not found' })
     const project = projects[0]

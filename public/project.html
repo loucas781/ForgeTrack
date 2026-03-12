@@ -65,10 +65,12 @@
       document.getElementById('ci-project').value = project.id
       const asgn = document.getElementById('ci-assignee')
       populateSelect(asgn, users.filter(u => u.role === 'admin' || u.role === 'engineer'), 'id', 'name', 'Unassigned')
+      await applyCreateIssuePrefs()
       openModal('create-issue-modal')
     })
     document.getElementById('create-issue-form')?.addEventListener('submit', async e => {
       e.preventDefault()
+      if (!validateCreateIssuePrefs()) return
       try {
         const issue = await POST('/issues', {
           project_id:   document.getElementById('ci-project').value,
@@ -229,10 +231,9 @@
       if (bugsOnly) document.getElementById('ci-type').value = 'bug'
       const asgn = document.getElementById('ci-assignee')
       populateSelect(asgn, users.filter(u => u.role === 'admin' || u.role === 'engineer'), 'id', 'name', 'Unassigned')
+      await applyCreateIssuePrefs()
       openModal('create-issue-modal')
     })
-
-    await fetchAndRender()
   }
 
   // ── Project settings view ───────────────────────────────────────────────────
