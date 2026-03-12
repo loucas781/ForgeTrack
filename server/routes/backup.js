@@ -176,94 +176,102 @@ router.post('/restore', async (req, res) => {
   try {
     await client.query('BEGIN')
 
-    // ── 1. Users ─────────────────────────────────────────────────────────────
-    // Two-step upsert: try conflict on id first (same-instance restore),
-    // then fall back to updating by email (cross-instance / re-install restore).
-    for (const u of (tables.users || [])) {
+    // ── Helper: run a query inside a savepoint so a failure never aborts the ──
+    // outer transaction. Uses unique savepoint names to avoid conflicts.        
+    // Returns { result, err } — caller decides whether to retry or throw.       
+    let _spSeq = 0
+    async function sp(fn) {
+      const name = `sp_${++_spSeq}`
+      await client.query(`SAVEPOINT ${name}`)
       try {
-        await client.query(`
-          INSERT INTO users (id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, created_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-          ON CONFLICT (id) DO UPDATE SET
-            name=$2, email=$3, initials=$5, color=$6, avatar=$7,
-            role=$8, is_active=$9, totp_secret=$10, totp_enabled=$11
-        `, [
-          u.id, u.name, u.email, u.password, u.initials, u.color,
-          u.avatar || null, u.role, u.is_active ?? true,
-          u.totp_secret || null, u.totp_enabled ?? false,
-          u.created_at,
-        ])
-      } catch (upsertErr) {
-        // Email already exists under a different id (cross-instance or re-install).
-        // Update the existing row by email instead of inserting a duplicate.
-        if (upsertErr.constraint === 'users_email_key') {
-          await client.query(`
+        const result = await fn()
+        await client.query(`RELEASE SAVEPOINT ${name}`)
+        return { result, err: null }
+      } catch (err) {
+        await client.query(`ROLLBACK TO SAVEPOINT ${name}`)
+        return { result: null, err }
+      }
+    }
+
+    // ── 1. Users ─────────────────────────────────────────────────────────────
+    // Try upsert by id first (same-instance restore).
+    // If email constraint fires (cross-instance / re-install), update by email.
+    for (const u of (tables.users || [])) {
+      const params = [
+        u.id, u.name, u.email, u.password, u.initials, u.color,
+        u.avatar || null, u.role, u.is_active ?? true,
+        u.totp_secret || null, u.totp_enabled ?? false,
+        u.created_at,
+      ]
+      const { err } = await sp(() => client.query(`
+        INSERT INTO users (id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        ON CONFLICT (id) DO UPDATE SET
+          name=$2, email=$3, initials=$5, color=$6, avatar=$7,
+          role=$8, is_active=$9, totp_secret=$10, totp_enabled=$11
+      `, params))
+      if (err) {
+        if (err.constraint === 'users_email_key') {
+          // Email belongs to a different id — update by email instead
+          const { err: fbErr } = await sp(() => client.query(`
             UPDATE users SET
               name=$1, password=$2, initials=$3, color=$4, avatar=$5,
               role=$6, is_active=$7, totp_secret=$8, totp_enabled=$9
             WHERE email=$10
-          `, [
-            u.name, u.password, u.initials, u.color,
-            u.avatar || null, u.role, u.is_active ?? true,
-            u.totp_secret || null, u.totp_enabled ?? false,
-            u.email,
-          ])
-        } else {
-          throw upsertErr
-        }
+          `, [u.name, u.password, u.initials, u.color,
+              u.avatar || null, u.role, u.is_active ?? true,
+              u.totp_secret || null, u.totp_enabled ?? false, u.email]))
+          if (fbErr) throw fbErr
+        } else { throw err }
       }
       stats.users++
     }
 
     // ── 2. Projects ───────────────────────────────────────────────────────────
-    // Same two-step approach: id first, fall back to key on cross-instance restore.
+    // Try upsert by id first; fall back to update by key on cross-instance restore.
     for (const p of (tables.projects || [])) {
-      try {
-        await client.query(`
-          INSERT INTO projects (id, key, name, description, lead_id, created_by, color, archived, is_closed, icon, created_at)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-          ON CONFLICT (id) DO UPDATE SET
-            key=$2, name=$3, description=$4, lead_id=$5, created_by=$6,
-            color=$7, archived=$8, is_closed=$9, icon=$10
-        `, [
-          p.id, p.key, p.name, p.description || null,
-          p.lead_id || null, p.created_by || null,
-          p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
-          p.icon || null, p.created_at,
-        ])
-      } catch (projErr) {
-        // Project key already exists under a different id (cross-instance restore).
-        if (projErr.constraint === 'projects_key_key') {
-          await client.query(`
+      const params = [
+        p.id, p.key, p.name, p.description || null,
+        p.lead_id || null, p.created_by || null,
+        p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
+        p.icon || null, p.created_at,
+      ]
+      const { err } = await sp(() => client.query(`
+        INSERT INTO projects (id, key, name, description, lead_id, created_by, color, archived, is_closed, icon, created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        ON CONFLICT (id) DO UPDATE SET
+          key=$2, name=$3, description=$4, lead_id=$5, created_by=$6,
+          color=$7, archived=$8, is_closed=$9, icon=$10
+      `, params))
+      if (err) {
+        if (err.constraint === 'projects_key_key') {
+          const { err: fbErr } = await sp(() => client.query(`
             UPDATE projects SET
               name=$1, description=$2, lead_id=$3, created_by=$4,
               color=$5, archived=$6, is_closed=$7, icon=$8
             WHERE key=$9
-          `, [
-            p.name, p.description || null,
-            p.lead_id || null, p.created_by || null,
-            p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
-            p.icon || null, p.key,
-          ])
-        } else {
-          throw projErr
-        }
+          `, [p.name, p.description || null,
+              p.lead_id || null, p.created_by || null,
+              p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
+              p.icon || null, p.key]))
+          if (fbErr) throw fbErr
+        } else { throw err }
       }
       stats.projects++
     }
 
     // ── 3. Issue counters ─────────────────────────────────────────────────────
     for (const c of (tables.issue_counters || [])) {
-      await client.query(`
+      await sp(() => client.query(`
         INSERT INTO issue_counters (project_id, counter)
         VALUES ($1, $2)
         ON CONFLICT (project_id) DO UPDATE SET counter = GREATEST(issue_counters.counter, EXCLUDED.counter)
-      `, [c.project_id, c.counter ?? c.last_number ?? 0])
+      `, [c.project_id, c.counter ?? c.last_number ?? 0]))
     }
 
     // ── 4. Issues ─────────────────────────────────────────────────────────────
     for (const i of (tables.issues || [])) {
-      await client.query(`
+      await sp(() => client.query(`
         INSERT INTO issues (id, key, project_id, title, description, type, status, priority,
                             assignee_id, reporter_id, story_points, due_date, created_at, updated_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
@@ -277,32 +285,32 @@ router.post('/restore', async (req, res) => {
         i.assignee_id || null, i.reporter_id || null,
         i.story_points || null, i.due_date || null,
         i.created_at, i.updated_at || i.created_at,
-      ])
+      ]))
       stats.issues++
     }
 
     // ── 5. Labels ─────────────────────────────────────────────────────────────
     for (const l of (tables.issue_labels || [])) {
-      await client.query(`
+      await sp(() => client.query(`
         INSERT INTO issue_labels (issue_id, label) VALUES ($1, $2)
         ON CONFLICT DO NOTHING
-      `, [l.issue_id, l.label])
+      `, [l.issue_id, l.label]))
       stats.labels++
     }
 
     // ── 6. Comments ───────────────────────────────────────────────────────────
     for (const c of (tables.comments || [])) {
-      await client.query(`
+      await sp(() => client.query(`
         INSERT INTO comments (id, issue_id, author_id, body, created_at)
         VALUES ($1,$2,$3,$4,$5)
         ON CONFLICT (id) DO UPDATE SET body=$4
-      `, [c.id, c.issue_id, c.author_id || null, c.body, c.created_at])
+      `, [c.id, c.issue_id, c.author_id || null, c.body, c.created_at]))
       stats.comments++
     }
 
     // ── 7. Attachments (metadata) ─────────────────────────────────────────────
     for (const a of (tables.issue_attachments || [])) {
-      await client.query(`
+      await sp(() => client.query(`
         INSERT INTO issue_attachments (id, issue_id, uploader_id, filename, mime_type, filepath, data, created_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
         ON CONFLICT (id) DO UPDATE SET filename=$4, mime_type=$5, filepath=$6
@@ -310,16 +318,16 @@ router.post('/restore', async (req, res) => {
         a.id, a.issue_id, a.uploader_id || null,
         a.filename, a.mime_type, a.filepath || null,
         a.data || null, a.created_at,
-      ])
+      ]))
       stats.attachments++
     }
 
     // ── 8. App preferences ────────────────────────────────────────────────────
     for (const p of (tables.app_preferences || [])) {
-      await client.query(`
+      await sp(() => client.query(`
         INSERT INTO app_preferences (key, value, updated_at) VALUES ($1,$2,NOW())
         ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()
-      `, [p.key, p.value])
+      `, [p.key, p.value]))
       stats.preferences++
     }
 
@@ -341,7 +349,7 @@ router.post('/restore', async (req, res) => {
     })
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
-    console.error('backup restore:', err.message)
+    console.error('backup restore error:', err.message, '| code:', err.code, '| constraint:', err.constraint, '| detail:', err.detail)
     res.status(500).json({ error: 'Restore failed: ' + err.message })
   } finally {
     client.release()
