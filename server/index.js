@@ -310,6 +310,40 @@ app.post('/api/config/email/test', requireAuth, async (req, res) => {
   res.json({ ok: true, sentTo: me.email })
 })
 
+// ── GET /api/preferences — read app preferences ───────────────────────────────
+app.get('/api/preferences', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await require('./db/connection').query('SELECT key, value FROM app_preferences')
+    const prefs = {}
+    rows.forEach(r => {
+      try { prefs[r.key] = JSON.parse(r.value) } catch { prefs[r.key] = r.value }
+    })
+    res.json(prefs)
+  } catch (err) {
+    console.error('prefs get:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── PATCH /api/preferences — update app preferences (admin only) ──────────────
+app.patch('/api/preferences', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' })
+  try {
+    const db2 = require('./db/connection')
+    for (const [key, value] of Object.entries(req.body)) {
+      await db2.query(
+        `INSERT INTO app_preferences (key, value, updated_at) VALUES ($1, $2, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [key, JSON.stringify(value)]
+      )
+    }
+    res.json({ ok: true })
+  } catch (err) {
+    console.error('prefs patch:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
 // ── 404 handler ────────────────────────────────────────────────────────────────
 app.use((req, res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' })

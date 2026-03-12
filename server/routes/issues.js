@@ -96,9 +96,10 @@ router.post('/', async (req, res) => {
     if (!project_id || !title?.trim())
       return res.status(400).json({ error: 'project_id and title are required.' })
 
-    const { rows: projects } = await db.query('SELECT id, key FROM projects WHERE id = $1', [project_id])
+    const { rows: projects } = await db.query('SELECT id, key, is_closed FROM projects WHERE id = $1', [project_id])
     if (!projects.length) return res.status(404).json({ error: 'Project not found' })
     const project = projects[0]
+    if (project.is_closed) return res.status(403).json({ error: 'This project is closed. No new issues can be created.' })
 
     // Atomic counter increment
     const { rows: [{ counter }] } = await db.query(

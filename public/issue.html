@@ -177,7 +177,7 @@
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Assignee</div>
                   ${canEditAssignee
-                    ? `<select class="form-control" id="sf-assignee"><option value="">Unassigned</option>${users.map(u=>`<option value="${u.id}"${u.id===iss.assignee_id?' selected':''}>${esc(u.name)}</option>`).join('')}</select>`
+                    ? `<select class="form-control" id="sf-assignee"><option value="">Unassigned</option>${users.filter(u => u.role === 'admin' || u.role === 'engineer').map(u=>`<option value="${u.id}"${u.id===iss.assignee_id?' selected':''}>${esc(u.name)}</option>`).join('')}</select>`
                     : `<div style="display:flex;align-items:center;gap:8px;font-size:13px">${assignee ? `${avatarHtml(assignee,20)} <span>${esc(assignee.name)}</span>` : '<span class="text-3">Unassigned</span>'}</div>`}
                 </div>
                 <div class="sidebar-field">
@@ -413,7 +413,7 @@
       const projs = await GET('/projects')
       populateSelect(document.getElementById('ci-project'), projs, 'id', 'name')
       document.getElementById('ci-project').value = issue.project_id
-      populateSelect(document.getElementById('ci-assignee'), users, 'id', 'name', 'Unassigned')
+      populateSelect(document.getElementById('ci-assignee'), users.filter(u => u.role === 'admin' || u.role === 'engineer'), 'id', 'name', 'Unassigned')
       openModal('create-issue-modal')
     })
     document.getElementById('create-issue-form')?.addEventListener('submit', async e => {

@@ -159,6 +159,17 @@ async function migrate() {
         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
+      -- ── Project enhancements ─────────────────────────────────────────────
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_by TEXT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_closed BOOLEAN NOT NULL DEFAULT FALSE;
+
+      -- ── App preferences (key-value store) ────────────────────────────────
+      CREATE TABLE IF NOT EXISTS app_preferences (
+        key         TEXT PRIMARY KEY,
+        value       TEXT NOT NULL,
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
       -- ── Audit log ──────────────────────────────────────────────────────────
       CREATE TABLE IF NOT EXISTS audit_log (
         id          TEXT PRIMARY KEY,
