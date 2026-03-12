@@ -238,6 +238,10 @@ app.use('/api/projects', require('./routes/projects'))
 app.use('/api/issues',   require('./routes/issues'))
 app.use('/api/users',    require('./routes/users'))
 
+// Backup restore needs raw text body (the .ftbackup JSON file)
+app.use('/api/backup/restore', express.text({ limit: '256mb', type: '*/*' }))
+app.use('/api/backup', require('./routes/backup'))
+
 // ── Page routing — serve HTML files, guard protected pages ────────────────────
 // Public pages — served as-is, client JS handles redirect if already logged in
 app.get('/login.html',           (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')))
