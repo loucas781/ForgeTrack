@@ -17,6 +17,7 @@ if [[ "$APP_ENV" != "development" && "$APP_ENV" != "staging" && "$APP_ENV" != "p
 fi
 COOKIE_SECURE="false"
 [[ "$APP_ENV" == "production" || "$APP_ENV" == "staging" ]] && COOKIE_SECURE="true"
+# It must stay false while running over plain HTTP or logins will silently fail
 msg_ok "Deploying environment: ${APP_ENV}"
 
 # ── 1. OS update ──────────────────────────────────────────────────────────────
@@ -87,12 +88,15 @@ msg_ok "Node.js dependencies installed"
 # ── 8. Write .env ─────────────────────────────────────────────────────────────
 msg_info "Writing configuration"
 JWT_SECRET=$(openssl rand -hex 48)
+PASSWORD_PEPPER=$(openssl rand -hex 32)
 cat > /opt/forgetrack/.env.${APP_ENV} << ENVEOF
 NODE_ENV=${APP_ENV}
 PORT=3000
 APP_NAME=ForgeTrack
 APP_ENV=${APP_ENV}
+APP_URL=http://$(hostname -I | awk '{print $1}'):3000
 JWT_SECRET=${JWT_SECRET}
+PASSWORD_PEPPER=${PASSWORD_PEPPER}
 DATABASE_URL=postgresql://forgetrack:${DB_PASS}@localhost:5432/forgetrack
 COOKIE_SECURE=${COOKIE_SECURE}
 TRUST_PROXY=false
@@ -135,13 +139,26 @@ msg_ok "ForgeTrack service started"
 cat > /opt/forgetrack/update.sh << 'UPDATEEOF'
 #!/usr/bin/env bash
 set -e; cd /opt/forgetrack
+
+# Detect APP_ENV from whichever .env.* file exists (production > staging > development)
+if   [[ -f .env.production  ]]; then APP_ENV=production
+elif [[ -f .env.staging      ]]; then APP_ENV=staging
+else                                   APP_ENV=development
+fi
+
+# Extract DATABASE_URL so the migration can always connect without a password prompt
+DB_URL=$(grep -E '^DATABASE_URL=' ".env.${APP_ENV}" 2>/dev/null | cut -d= -f2-)
+if [[ -z "$DB_URL" ]]; then
+  echo "ERROR: Could not read DATABASE_URL from .env.${APP_ENV}" >&2; exit 1
+fi
+
 # Keep .env files safe — git must never overwrite them
 echo ".env.*" >> .git/info/exclude 2>/dev/null || true
 git fetch origin
 git reset --hard origin/develop
 mkdir -p /tmp/npm-cache
 HOME=/root npm install --omit=dev --cache /tmp/npm-cache --unsafe-perm --no-audit --no-fund
-HOME=/root NODE_ENV=${APP_ENV} node server/db/migrate.js
+HOME=/root NODE_ENV=${APP_ENV} DATABASE_URL="${DB_URL}" node server/db/migrate.js
 systemctl restart forgetrack
 echo "✓ ForgeTrack updated to $(cat .version)"
 UPDATEEOF
