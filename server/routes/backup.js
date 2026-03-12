@@ -177,36 +177,78 @@ router.post('/restore', async (req, res) => {
     await client.query('BEGIN')
 
     // ── 1. Users ─────────────────────────────────────────────────────────────
+    // Two-step upsert: try conflict on id first (same-instance restore),
+    // then fall back to updating by email (cross-instance / re-install restore).
     for (const u of (tables.users || [])) {
-      await client.query(`
-        INSERT INTO users (id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, created_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-        ON CONFLICT (id) DO UPDATE SET
-          name=$2, email=$3, initials=$5, color=$6, avatar=$7,
-          role=$8, is_active=$9, totp_secret=$10, totp_enabled=$11
-      `, [
-        u.id, u.name, u.email, u.password, u.initials, u.color,
-        u.avatar || null, u.role, u.is_active ?? true,
-        u.totp_secret || null, u.totp_enabled ?? false,
-        u.created_at,
-      ])
+      try {
+        await client.query(`
+          INSERT INTO users (id, name, email, password, initials, color, avatar, role, is_active, totp_secret, totp_enabled, created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          ON CONFLICT (id) DO UPDATE SET
+            name=$2, email=$3, initials=$5, color=$6, avatar=$7,
+            role=$8, is_active=$9, totp_secret=$10, totp_enabled=$11
+        `, [
+          u.id, u.name, u.email, u.password, u.initials, u.color,
+          u.avatar || null, u.role, u.is_active ?? true,
+          u.totp_secret || null, u.totp_enabled ?? false,
+          u.created_at,
+        ])
+      } catch (upsertErr) {
+        // Email already exists under a different id (cross-instance or re-install).
+        // Update the existing row by email instead of inserting a duplicate.
+        if (upsertErr.constraint === 'users_email_key') {
+          await client.query(`
+            UPDATE users SET
+              name=$1, password=$2, initials=$3, color=$4, avatar=$5,
+              role=$6, is_active=$7, totp_secret=$8, totp_enabled=$9
+            WHERE email=$10
+          `, [
+            u.name, u.password, u.initials, u.color,
+            u.avatar || null, u.role, u.is_active ?? true,
+            u.totp_secret || null, u.totp_enabled ?? false,
+            u.email,
+          ])
+        } else {
+          throw upsertErr
+        }
+      }
       stats.users++
     }
 
     // ── 2. Projects ───────────────────────────────────────────────────────────
+    // Same two-step approach: id first, fall back to key on cross-instance restore.
     for (const p of (tables.projects || [])) {
-      await client.query(`
-        INSERT INTO projects (id, key, name, description, lead_id, created_by, color, archived, is_closed, icon, created_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-        ON CONFLICT (id) DO UPDATE SET
-          key=$2, name=$3, description=$4, lead_id=$5, created_by=$6,
-          color=$7, archived=$8, is_closed=$9, icon=$10
-      `, [
-        p.id, p.key, p.name, p.description || null,
-        p.lead_id || null, p.created_by || null,
-        p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
-        p.icon || null, p.created_at,
-      ])
+      try {
+        await client.query(`
+          INSERT INTO projects (id, key, name, description, lead_id, created_by, color, archived, is_closed, icon, created_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          ON CONFLICT (id) DO UPDATE SET
+            key=$2, name=$3, description=$4, lead_id=$5, created_by=$6,
+            color=$7, archived=$8, is_closed=$9, icon=$10
+        `, [
+          p.id, p.key, p.name, p.description || null,
+          p.lead_id || null, p.created_by || null,
+          p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
+          p.icon || null, p.created_at,
+        ])
+      } catch (projErr) {
+        // Project key already exists under a different id (cross-instance restore).
+        if (projErr.constraint === 'projects_key_key') {
+          await client.query(`
+            UPDATE projects SET
+              name=$1, description=$2, lead_id=$3, created_by=$4,
+              color=$5, archived=$6, is_closed=$7, icon=$8
+            WHERE key=$9
+          `, [
+            p.name, p.description || null,
+            p.lead_id || null, p.created_by || null,
+            p.color || '#0052cc', p.archived ?? false, p.is_closed ?? false,
+            p.icon || null, p.key,
+          ])
+        } else {
+          throw projErr
+        }
+      }
       stats.projects++
     }
 
