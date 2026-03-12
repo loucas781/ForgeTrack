@@ -13,10 +13,12 @@
       flex-shrink: 0;
       background: var(--surface);
       border-bottom: 1px solid var(--border-2);
+      min-width: 0;
     }
     .settings-tabs {
       display: flex; gap: 0; overflow-x: auto; scrollbar-width: none;
       padding: 0 16px;
+      min-width: 0;
     }
     .settings-tabs::-webkit-scrollbar { display: none; }
     .settings-tab {
@@ -26,6 +28,7 @@
       font-family: var(--font); font-size: 13px; font-weight: 500;
       color: var(--text-2); cursor: pointer; white-space: nowrap;
       transition: color var(--t-fast), border-color var(--t-fast);
+      flex-shrink: 0;
     }
     .settings-tab:hover { color: var(--text); }
     .settings-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
@@ -42,6 +45,11 @@
       font-family: var(--font); font-size: 14px; font-weight: 500;
       color: var(--text); cursor: pointer;
       appearance: auto;
+    }
+    @media (max-width: 600px) {
+      .settings-tabs { display: none; }
+      .settings-mobile-select { display: block; }
+      .settings-tabs-wrap { border-bottom: none; }
     }
     .settings-panel { display: none; padding: 24px; max-width: 720px; }
     .settings-panel.active { display: block; }
