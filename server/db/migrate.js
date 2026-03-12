@@ -127,6 +127,10 @@ async function migrate() {
       ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
       ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','lead','member'));
 
+      -- ── Update role CHECK to include engineer ─────────────────────────
+      ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+      ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin','lead','member','engineer'));
+
       -- ── Password reset tokens ─────────────────────────────────────
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id          TEXT PRIMARY KEY,
@@ -153,6 +157,17 @@ async function migrate() {
         expires_at  TIMESTAMPTZ NOT NULL,
         used        BOOLEAN NOT NULL DEFAULT FALSE,
         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      -- ── Project enhancements ─────────────────────────────────────────────
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_by TEXT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_closed BOOLEAN NOT NULL DEFAULT FALSE;
+
+      -- ── App preferences (key-value store) ────────────────────────────────
+      CREATE TABLE IF NOT EXISTS app_preferences (
+        key         TEXT PRIMARY KEY,
+        value       TEXT NOT NULL,
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
       -- ── Audit log ──────────────────────────────────────────────────────────

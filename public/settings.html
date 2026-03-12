@@ -81,14 +81,69 @@
     .modal-box { background:var(--surface);border-radius:var(--r-xl);padding:24px;width:100%;max-width:400px;box-shadow:0 24px 80px rgba(9,30,66,.3); }
     .modal-title { font-size:16px;font-weight:700;margin-bottom:4px; }
     .modal-sub { font-size:13px;color:var(--text-2);margin-bottom:18px; }
+    /* Backup panel */
+    .backup-section { margin-bottom: 28px; }
+    .backup-section:last-child { margin-bottom: 0; }
+    .backup-section h4 { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
+    .backup-section p  { font-size: 12px; color: var(--text-2); margin: 0 0 14px; line-height: 1.5; }
+    .backup-meta { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 16px; }
+    .backup-meta-item { background: var(--gray-50); border: 1px solid var(--border-2); border-radius: var(--r-md); padding: 10px 12px; }
+    .backup-meta-item .bm-val { font-size: 20px; font-weight: 700; font-family: var(--mono); color: var(--text); line-height: 1; }
+    .backup-meta-item .bm-lbl { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+    .restore-preview { background: var(--gray-50); border: 1px solid var(--border-2); border-radius: var(--r-lg); padding: 16px; margin-bottom: 16px; }
+    .restore-preview h5 { font-size: 12px; font-weight: 700; color: var(--text-2); margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; }
+    .restore-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border-2); }
+    .restore-row:last-child { border-bottom: none; }
+    .restore-row span:first-child { color: var(--text-2); }
+    .restore-row span:last-child { font-family: var(--mono); font-weight: 600; color: var(--text); }
+    .backup-drop-zone {
+      border: 2px dashed var(--border); border-radius: var(--r-lg);
+      padding: 32px 24px; text-align: center; cursor: pointer;
+      transition: border-color var(--t-fast), background var(--t-fast);
+      background: var(--gray-50);
+    }
+    .backup-drop-zone:hover, .backup-drop-zone.drag-over { border-color: var(--brand); background: var(--brand-light); }
+    .backup-drop-zone svg { color: var(--text-3); margin-bottom: 8px; }
+    .backup-drop-zone p { margin: 0; font-size: 13px; color: var(--text-2); }
+    .backup-drop-zone small { font-size: 11px; color: var(--text-3); }
+    .backup-progress { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--brand-light); border: 1px solid var(--brand); border-radius: var(--r-lg); font-size: 13px; color: var(--brand); }
+    .backup-result-ok  { padding: 12px 16px; background: rgba(0,135,90,.08); border: 1px solid rgba(0,135,90,.3); border-radius: var(--r-lg); font-size: 13px; }
+    .backup-result-err { padding: 12px 16px; background: rgba(222,53,11,.06); border: 1px solid rgba(222,53,11,.25); border-radius: var(--r-lg); font-size: 13px; color: var(--red,#de350b); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; display: inline-block; }
+    .role-tabs-wrap { border-bottom: 1px solid var(--border-2); margin-bottom: 20px; }
+    .role-tabs { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; }
+    .role-tabs::-webkit-scrollbar { display: none; }
+    .role-tab {
+      display: flex; align-items: center; gap: 6px;
+      padding: 9px 14px; background: none; border: none;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      font-family: var(--font); font-size: 12px; font-weight: 600;
+      color: var(--text-2); cursor: pointer; white-space: nowrap;
+      transition: color var(--t-fast), border-color var(--t-fast);
+    }
+    .role-tab:hover { color: var(--text); }
+    .role-tab.active { border-bottom-color: currentColor; }
+    .role-tab .role-count { font-size: 11px; font-weight: 400; opacity: .7; }
+    .role-panel { display: none; }
+    .role-panel.active { display: block; }
+    /* Preference toggle rows */
+    .pref-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border-2); gap: 16px; }
+    .pref-row:last-child { border-bottom: none; }
+    .pref-row-info { flex: 1; min-width: 0; }
+    .pref-row-info strong { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    .pref-row-info span { display: block; font-size: 12px; color: var(--text-3); }
+    .toggle-switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 11px; cursor: pointer; transition: background var(--t-fast); }
+    .toggle-slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform var(--t-fast); }
+    .toggle-switch input:checked + .toggle-slider { background: var(--brand); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
     @media (max-width: 600px) {
-      .settings-tabs { display: none; }
-      .settings-mobile-select { display: block; }
-      .settings-panel { padding: 16px; }
-      .info-table td:first-child { width: 120px; }
-      .member-actions { gap: 4px; margin-left: 0; padding-top: 4px; }
-      .member-actions .btn { padding: 5px 8px; font-size: 11px; }
-      .member-row-info { flex-wrap: nowrap; }
+      .role-tabs { flex-direction: column; border-bottom: none; }
+      .role-tab { border-bottom: none; border-left: 3px solid transparent; padding: 10px 14px; }
+      .role-tab.active { border-left-color: currentColor; border-bottom: none; }
+      .pref-row { flex-wrap: wrap; }
     }
   </style>
 </head>
@@ -113,6 +168,8 @@
       { id:'appearance',    label:'Appearance',    adminOnly: false, icon:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
       { id:'team',          label:'Team',          adminOnly: false, icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
       { id:'security',      label:'Security',      adminOnly: false, icon:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+      { id:'preferences',   label:'Preferences',   adminOnly: true,  icon:'<circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l-1.41-1.41M6.34 17.66l1.41-1.41"/>' },
+      { id:'backup',        label:'Backup',        adminOnly: true,  icon:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>' },
       { id:'email',         label:'Email',         adminOnly: true,  icon:'<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' },
       { id:'notifications', label:'Notifications', adminOnly: false, icon:'<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>' },
       { id:'account',       label:'Account',       adminOnly: false, icon:'<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
@@ -200,6 +257,7 @@
               <label class="form-label">Role</label>
               <select class="form-control" id="invite-role">
                 <option value="member">Member</option>
+                <option value="engineer">Engineer</option>
                 <option value="lead">Project Lead</option>
                 <option value="admin">Admin</option>
               </select>
@@ -209,36 +267,78 @@
           <div id="invite-result" style="display:none;margin-top:12px;padding:12px 14px;border-radius:var(--r-md);font-size:13px"></div>
         </div>` : ''}
         <div class="card section-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <h3 class="section-title" style="margin:0">Members (${users.length})</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <h3 class="section-title" style="margin:0">Team Members (${users.length})</h3>
             ${config.allowSignup ? `<span class="text-3 text-sm">Open signup: <a href="/signup.html" style="color:var(--brand)">/signup.html</a></span>` : `<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">Signup disabled</span>`}
           </div>
-          ${users.map(u => `
-            <div class="member-row" id="member-row-${u.id}">
-              <div class="member-row-info">
-                ${avatarHtml(u, 36)}
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                    ${esc(u.name)}
-                    ${u.id === me?.id ? `<span class="role-badge">you</span>` : ''}
-                    ${!u.is_active ? `<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">inactive</span>` : ''}
+          ${(function() {
+            // Helper to render a single member row
+            function memberRow(u) {
+              return `
+                <div class="member-row" id="member-row-${u.id}">
+                  <div class="member-row-info">
+                    ${avatarHtml(u, 36)}
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        ${esc(u.name)}
+                        ${u.id === me?.id ? `<span class="role-badge">you</span>` : ''}
+                        ${!u.is_active ? `<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:rgba(222,53,11,.08);color:var(--red,#de350b);border:1px solid rgba(222,53,11,.2);font-weight:600">inactive</span>` : ''}
+                      </div>
+                      <div class="text-3 text-sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.email)}</div>
+                    </div>
                   </div>
-                  <div class="text-3 text-sm" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.email)}</div>
-                </div>
-                <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:2px;background:${u.role==='admin'?'rgba(0,82,204,.1)':u.role==='lead'?'rgba(101,84,192,.1)':'var(--gray-100)'};color:${u.role==='admin'?'var(--brand)':u.role==='lead'?'#6554c0':'var(--text-2)'};flex-shrink:0;white-space:nowrap">${u.role==='lead'?'Project Lead':esc(u.role)}</span>
-              </div>
-              ${isAdmin && u.id !== me?.id ? `
-              <div class="member-actions">
-                <button class="btn btn-sm" onclick="changeRoleModal('${u.id}','${esc(u.name)}','${u.role}')">Change Role</button>
-                <button class="btn btn-sm" onclick="setPasswordModal('${u.id}','${esc(u.name)}')">Set Password</button>
-                <button class="btn btn-sm" onclick="getResetLink('${u.id}','${esc(u.name)}')">Reset Link</button>
-                ${u.is_active
-                  ? `<button class="btn btn-sm" style="color:var(--orange)" onclick="toggleActive('${u.id}', false)">Deactivate</button>`
-                  : `<button class="btn btn-sm" style="color:var(--green)" onclick="toggleActive('${u.id}', true)">Reactivate</button>`
-                }
-                <button class="btn btn-sm" style="color:var(--red,#de350b)" onclick="deleteUser('${u.id}','${esc(u.name)}')">Delete</button>
-              </div>` : ''}
-            </div>`).join('')}
+                  ${isAdmin && u.id !== me?.id ? `
+                  <div class="member-actions">
+                    <button class="btn btn-sm" onclick="changeRoleModal('${u.id}','${esc(u.name)}','${u.role}')">Change Role</button>
+                    <button class="btn btn-sm" onclick="setPasswordModal('${u.id}','${esc(u.name)}')">Set Password</button>
+                    <button class="btn btn-sm" onclick="getResetLink('${u.id}','${esc(u.name)}')">Reset Link</button>
+                    ${u.is_active
+                      ? `<button class="btn btn-sm" style="color:var(--orange)" onclick="toggleActive('${u.id}', false)">Deactivate</button>`
+                      : `<button class="btn btn-sm" style="color:var(--green)" onclick="toggleActive('${u.id}', true)">Reactivate</button>`
+                    }
+                    <button class="btn btn-sm" style="color:var(--red,#de350b)" onclick="deleteUser('${u.id}','${esc(u.name)}')">Delete</button>
+                  </div>` : ''}
+                </div>`
+            }
+
+            // Role group definitions
+            const ROLE_GROUPS = [
+              { role: 'admin',    label: 'Administrators',  desc: 'Full access to all settings and projects',                     color: 'var(--brand)',         bg: 'rgba(0,82,204,.08)',   icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+              { role: 'lead',     label: 'Project Leads',   desc: 'Manage projects and issues in projects they lead',             color: '#6554c0',              bg: 'rgba(101,84,192,.08)', icon: '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/><path d="M12 12l2 4-2 1-2-1 2-4z"/>' },
+              { role: 'engineer', label: 'Engineers',       desc: 'Create and work on issues, claim and reassign tickets',        color: 'var(--green,#00875a)', bg: 'rgba(0,135,90,.08)',  icon: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>' },
+              { role: 'member',   label: 'Members',         desc: 'View projects, create issues and leave comments',              color: 'var(--text-2)',        bg: 'var(--gray-100)',      icon: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+            ]
+
+            // Build sub-tab UI
+            const populated = ROLE_GROUPS.filter(g => users.some(u => u.role === g.role))
+
+            let tabsHtml = `<div class="role-tabs-wrap"><div class="role-tabs">`
+            populated.forEach((group, i) => {
+              const count = users.filter(u => u.role === group.role).length
+              tabsHtml += `
+                <button class="role-tab${i===0?' active':''}" style="color:${group.color}" data-role="${group.role}"
+                  onclick="switchRoleTab('${group.role}')">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">${group.icon}</svg>
+                  ${group.label} <span class="role-count">(${count})</span>
+                </button>`
+            })
+            tabsHtml += `</div></div>`
+
+            let panelsHtml = ''
+            populated.forEach((group, i) => {
+              const groupUsers = users.filter(u => u.role === group.role)
+              panelsHtml += `
+                <div class="role-panel${i===0?' active':''}" id="role-panel-${group.role}">
+                  <div style="padding:8px 0 12px;font-size:12px;color:var(--text-3)">${group.desc}</div>
+                  ${groupUsers.length === 0
+                    ? `<div style="padding:24px 0;text-align:center;color:var(--text-3);font-size:13px">No ${group.label.toLowerCase()} yet.</div>`
+                    : groupUsers.map(u => memberRow(u)).join('')
+                  }
+                </div>`
+            })
+
+            return tabsHtml + panelsHtml
+          })()}
         </div>
       </div>
 
@@ -267,6 +367,20 @@
               It will be available once you've deployed to staging or production behind your Nginx proxy.
             </p>
           </div>
+        </div>
+      </div>
+
+      <!-- Backup (admin only) -->
+      <div class="settings-panel" id="panel-backup">
+        <div class="card section-card" id="backup-card">
+          <div style="text-align:center;padding:24px;color:var(--text-3)">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Preferences (admin only) -->
+      <div class="settings-panel" id="panel-preferences">
+        <div class="card section-card" id="pref-card">
+          <div style="text-align:center;padding:24px;color:var(--text-3)">Loading preferences…</div>
         </div>
       </div>
 
@@ -550,6 +664,12 @@
       </div>` : ''}
       `
 
+    // ── Role sub-tab switching ─────────────────────────────────────────────
+    window.switchRoleTab = function(role) {
+      document.querySelectorAll('.role-tab').forEach(b => b.classList.toggle('active', b.dataset.role === role))
+      document.querySelectorAll('.role-panel').forEach(p => p.classList.toggle('active', p.id === 'role-panel-' + role))
+    }
+
     // ── Tab switching ──────────────────────────────────────────────
     function switchTab(id) {
       tabBar.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.panel === id))
@@ -563,20 +683,15 @@
       if (id === 'email')         { renderEmail() }
       if (id === 'team')          { wireInvite() }
       if (id === 'audit')         { renderAudit() }
+      if (id === 'preferences')   { renderPreferences() }
+      if (id === 'backup')        { renderBackup() }
     }
 
     // ── Admin: toggle active / delete / set password (Team tab) ──────────────
     async function toggleActive(userId, activate) {
-      const row = document.getElementById('member-row-' + userId)
       try {
         const res = await PATCH('/users/' + userId, { is_active: activate })
         if (!res.ok) return alert(res.error || 'Failed to update account.')
-        // Reload the team tab to reflect changes
-        const freshUsers = await GET('/users')
-        const membersCard = document.querySelector('#panel-team .section-card:last-child')
-        if (membersCard) {
-          membersCard.querySelector('.member-row') && location.reload()
-        }
         location.reload()
       } catch { alert('Something went wrong.') }
     }
@@ -680,7 +795,7 @@
     function changeRoleModal(userId, name, currentRole) {
       const existing = document.getElementById('change-role-modal')
       if (existing) existing.remove()
-      const ROLE_LABELS = { member: 'Member', lead: 'Project Lead', admin: 'Admin' }
+      const ROLE_LABELS = { member: 'Member', engineer: 'Engineer', lead: 'Project Lead', admin: 'Admin' }
       const modal = document.createElement('div')
       modal.className = 'modal-overlay'
       modal.id = 'change-role-modal'
@@ -692,6 +807,7 @@
             <label class="form-label">Role</label>
             <select class="form-control" id="change-role-select">
               <option value="member"${currentRole==='member'?' selected':''}>Member — can view projects, create &amp; comment on issues</option>
+              <option value="engineer"${currentRole==='engineer'?' selected':''}>Engineer — create & work issues, claim unassigned tickets, reassign to self</option>
               <option value="lead"${currentRole==='lead'?' selected':''}>Project Lead — can create projects and manage issues in projects they lead</option>
               <option value="admin"${currentRole==='admin'?' selected':''}>Admin — full access to everything</option>
             </select>
@@ -1375,6 +1491,372 @@
         if (nextBtn) nextBtn.disabled = auditOffset + AUDIT_PAGE >= data.total
       } catch (err) {
         wrap.innerHTML = `<p class="text-2 text-sm" style="color:var(--red)">Failed to load audit log: ${esc(err.message)}</p>`
+      }
+    }
+
+    // ── Preferences tab (admin only) ─────────────────────────────────────
+    async function renderPreferences() {
+      const card = document.getElementById('pref-card')
+      if (!card) return
+      if (!isAdmin) {
+        card.innerHTML = `<p class="text-2 text-sm">Preferences are only available to admins.</p>`
+        return
+      }
+      try {
+        const prefs = await GET('/preferences')
+        card.innerHTML = `
+          <h3 class="section-title" style="margin-bottom:4px">Project & Issue Defaults</h3>
+          <p class="text-2 text-sm" style="margin-bottom:20px">These settings control default behaviour across the application.</p>
+
+          <div class="pref-row">
+            <div class="pref-row-info">
+              <strong>Show only my projects in dashboard</strong>
+              <span>When enabled, the dashboard defaults to showing only projects created by or assigned to each user. Admins always see all projects.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="pref-myprojects" ${prefs.show_my_projects_only ? 'checked' : ''} />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-row-info">
+              <strong>Require issue due date</strong>
+              <span>Makes the due date field required when creating new issues.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="pref-requiredue" ${prefs.require_due_date ? 'checked' : ''} />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-row-info">
+              <strong>Require assignee on new issues</strong>
+              <span>Prevents issues from being created without an assignee.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="pref-requireassignee" ${prefs.require_assignee ? 'checked' : ''} />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-row-info">
+              <strong>Default issue type</strong>
+              <span>Pre-selected type when opening the create issue form.</span>
+            </div>
+            <select class="form-control" id="pref-defaulttype" style="width:140px;flex-shrink:0">
+              ${['task','bug','story','epic'].map(t => `<option value="${t}"${(prefs.default_issue_type||'task')===t?' selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-row-info">
+              <strong>Default issue priority</strong>
+              <span>Pre-selected priority when opening the create issue form.</span>
+            </div>
+            <select class="form-control" id="pref-defaultpriority" style="width:140px;flex-shrink:0">
+              ${['critical','high','medium','low','trivial'].map(p => `<option value="${p}"${(prefs.default_priority||'medium')===p?' selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-row-info">
+              <strong>Allow members to create projects</strong>
+              <span>When disabled, only Admins and Project Leads can create new projects.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="pref-membercreateproj" ${prefs.members_can_create_projects !== false ? 'checked' : ''} />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div style="margin-top:20px;display:flex;align-items:center;gap:12px">
+            <button class="btn btn-primary" id="pref-save">Save Preferences</button>
+            <span id="pref-saved" style="color:var(--green);font-size:13px;display:none">✓ Saved!</span>
+          </div>`
+
+        document.getElementById('pref-save').addEventListener('click', async () => {
+          try {
+            await PATCH('/preferences', {
+              show_my_projects_only:     document.getElementById('pref-myprojects').checked,
+              require_due_date:          document.getElementById('pref-requiredue').checked,
+              require_assignee:          document.getElementById('pref-requireassignee').checked,
+              default_issue_type:        document.getElementById('pref-defaulttype').value,
+              default_priority:          document.getElementById('pref-defaultpriority').value,
+              members_can_create_projects: document.getElementById('pref-membercreateproj').checked,
+            })
+            const saved = document.getElementById('pref-saved')
+            saved.style.display = 'inline'
+            setTimeout(() => saved.style.display = 'none', 2500)
+          } catch (err) { alert('Failed to save preferences: ' + err.message) }
+        })
+      } catch (err) {
+        card.innerHTML = `<p class="text-2 text-sm" style="color:var(--red)">Failed to load preferences.</p>`
+      }
+    }
+
+    // ── Backup & Restore ──────────────────────────────────────────────────────
+    async function renderBackup() {
+      const card = document.getElementById('backup-card')
+      if (!card) return
+      if (!isAdmin) {
+        card.innerHTML = `<p class="text-2 text-sm">Backup & Restore is only available to admins.</p>`
+        return
+      }
+
+      // Fetch live DB counts to show in the export section
+      let counts = { users: '…', projects: '…', issues: '…', comments: '…', attachments: '…' }
+      try {
+        const [u, p, i, c, a] = await Promise.all([
+          GET('/users'), GET('/projects'), GET('/issues'),
+          fetch('/api/issues').then(() => null).catch(() => null), // placeholder
+          fetch('/api/issues').then(() => null).catch(() => null),
+        ])
+        counts = {
+          users:       Array.isArray(u) ? u.length : '?',
+          projects:    Array.isArray(p) ? p.length : '?',
+          issues:      Array.isArray(i) ? i.length : '?',
+        }
+      } catch {}
+
+      card.innerHTML = `
+        <!-- Export -->
+        <div class="backup-section">
+          <h3 class="section-title" style="margin-bottom:4px">Export Backup</h3>
+          <p class="text-2 text-sm" style="margin-bottom:16px">
+            Downloads a single <code style="font-family:var(--mono);font-size:11px;padding:1px 5px;background:var(--gray-100);border-radius:3px">.ftbackup</code>
+            file containing your entire database — users, projects, issues, comments, labels, attachments, preferences and audit log —
+            plus all uploaded images and files embedded directly in the archive. No external tools required.
+          </p>
+          <div class="backup-meta" id="backup-live-counts">
+            <div class="backup-meta-item"><div class="bm-val">${counts.users}</div><div class="bm-lbl">Users</div></div>
+            <div class="backup-meta-item"><div class="bm-val">${counts.projects}</div><div class="bm-lbl">Projects</div></div>
+            <div class="backup-meta-item"><div class="bm-val">${counts.issues}</div><div class="bm-lbl">Issues</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="export-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Backup
+            </button>
+            <span id="export-status" style="font-size:12px;color:var(--text-3)">Includes all files and images</span>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border-2);margin:24px 0"></div>
+
+        <!-- Restore -->
+        <div class="backup-section">
+          <h3 class="section-title" style="margin-bottom:4px">Restore from Backup</h3>
+          <p class="text-2 text-sm" style="margin-bottom:8px">
+            Upload a <code style="font-family:var(--mono);font-size:11px;padding:1px 5px;background:var(--gray-100);border-radius:3px">.ftbackup</code> file to restore data.
+            Restore is <strong>additive</strong> — existing records are updated with backup values and records not in the backup are left untouched.
+            This means it is safe to run against a live instance and will never delete data you have created since the backup was taken.
+          </p>
+          <div style="padding:10px 14px;background:rgba(255,152,0,.07);border:1px solid rgba(255,152,0,.3);border-radius:var(--r-md);font-size:12px;color:var(--orange,#ff9800);margin-bottom:16px;display:flex;gap:10px;align-items:flex-start">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>Passwords and 2FA secrets are included in the backup. Restoring on a new instance will allow users to log in with their original credentials immediately. If the new instance uses a different <code style="font-family:var(--mono);font-size:11px">PASSWORD_PEPPER</code>, users will need to reset their passwords.</span>
+          </div>
+
+          <div class="backup-drop-zone" id="restore-drop-zone">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p>Drop a <strong>.ftbackup</strong> file here, or click to browse</p>
+            <small>Maximum 256 MB</small>
+            <input type="file" id="restore-file-input" accept=".ftbackup,application/octet-stream" style="display:none" />
+          </div>
+
+          <div id="restore-preview-area" style="margin-top:16px;display:none"></div>
+          <div id="restore-result-area"  style="margin-top:16px;display:none"></div>
+        </div>`
+
+      // ── Export button ───────────────────────────────────────────────────────
+      document.getElementById('export-btn').addEventListener('click', async () => {
+        const btn    = document.getElementById('export-btn')
+        const status = document.getElementById('export-status')
+        btn.disabled = true
+        btn.innerHTML = `<svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg> Generating…`
+        status.textContent = 'Building backup — this may take a moment for large instances…'
+        try {
+          const resp = await fetch('/api/backup/export', { credentials: 'include' })
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({ error: 'Export failed' }))
+            throw new Error(err.error || 'Export failed')
+          }
+          // Stream response into a Blob then trigger download
+          const blob = await resp.blob()
+          const cd   = resp.headers.get('Content-Disposition') || ''
+          const fnMatch = cd.match(/filename="([^"]+)"/)
+          const filename = fnMatch ? fnMatch[1] : 'forgetrack-backup.ftbackup'
+          const url  = URL.createObjectURL(blob)
+          const a    = document.createElement('a')
+          a.href = url; a.download = filename
+          document.body.appendChild(a); a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+          const kb = (blob.size / 1024).toFixed(0)
+          const mb = (blob.size / 1024 / 1024).toFixed(2)
+          status.textContent = `✓ Downloaded ${blob.size > 1024*1024 ? mb + ' MB' : kb + ' KB'} — ${filename}`
+          status.style.color = 'var(--green)'
+        } catch (err) {
+          status.textContent = '✗ ' + err.message
+          status.style.color = 'var(--red,#de350b)'
+        } finally {
+          btn.disabled = false
+          btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Backup`
+        }
+      })
+
+      // ── Drop zone & file picker ────────────────────────────────────────────
+      const dropZone  = document.getElementById('restore-drop-zone')
+      const fileInput = document.getElementById('restore-file-input')
+
+      dropZone.addEventListener('click', () => fileInput.click())
+      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over') })
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'))
+      dropZone.addEventListener('drop', e => {
+        e.preventDefault(); dropZone.classList.remove('drag-over')
+        const file = e.dataTransfer.files[0]
+        if (file) handleRestoreFile(file)
+      })
+      fileInput.addEventListener('change', e => {
+        const file = e.target.files[0]
+        if (file) handleRestoreFile(file)
+      })
+
+      // ── Parse backup file and show preview ────────────────────────────────
+      function handleRestoreFile(file) {
+        const previewArea = document.getElementById('restore-preview-area')
+        const resultArea  = document.getElementById('restore-result-area')
+        resultArea.style.display = 'none'
+        resultArea.innerHTML = ''
+
+        if (!file.name.endsWith('.ftbackup') && file.type !== 'application/octet-stream' && file.type !== '') {
+          previewArea.style.display = 'block'
+          previewArea.innerHTML = `<div class="backup-result-err">Not a valid backup file. Please select a <code>.ftbackup</code> file.</div>`
+          return
+        }
+
+        previewArea.style.display = 'block'
+        previewArea.innerHTML = `<div class="backup-progress"><svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg> Reading backup file…</div>`
+
+        const reader = new FileReader()
+        reader.onerror = () => {
+          previewArea.innerHTML = `<div class="backup-result-err">Failed to read file.</div>`
+        }
+        reader.onload = ev => {
+          let manifest
+          try {
+            manifest = JSON.parse(ev.target.result)
+          } catch {
+            previewArea.innerHTML = `<div class="backup-result-err">File could not be parsed. Make sure it is a valid <code>.ftbackup</code> file and has not been modified.</div>`
+            return
+          }
+
+          if (manifest.format !== 'forgetrack-backup') {
+            previewArea.innerHTML = `<div class="backup-result-err">Not a ForgeTrack backup file.</div>`
+            return
+          }
+          if (manifest.version > 1) {
+            previewArea.innerHTML = `<div class="backup-result-err">This backup was created with a newer version of ForgeTrack (format v${manifest.version}). Please upgrade first.</div>`
+            return
+          }
+
+          const t = manifest.tables || {}
+          const fileCount = Object.keys(manifest.files || {}).length
+          const exportedAt = manifest.exported_at ? new Date(manifest.exported_at).toLocaleString() : 'unknown'
+          const instance   = manifest.instance || 'unknown'
+          const fileSizeMB = (file.size / 1024 / 1024).toFixed(2)
+
+          previewArea.innerHTML = `
+            <div class="restore-preview">
+              <h5>Backup Details</h5>
+              <div class="restore-row"><span>Exported at</span><span>${esc(exportedAt)}</span></div>
+              <div class="restore-row"><span>Source instance</span><span>${esc(instance)}</span></div>
+              <div class="restore-row"><span>File size</span><span>${fileSizeMB} MB</span></div>
+            </div>
+            <div class="restore-preview">
+              <h5>Contents</h5>
+              <div class="restore-row"><span>Users</span><span>${(t.users||[]).length}</span></div>
+              <div class="restore-row"><span>Projects</span><span>${(t.projects||[]).length}</span></div>
+              <div class="restore-row"><span>Issues</span><span>${(t.issues||[]).length}</span></div>
+              <div class="restore-row"><span>Comments</span><span>${(t.comments||[]).length}</span></div>
+              <div class="restore-row"><span>Labels</span><span>${(t.issue_labels||[]).length}</span></div>
+              <div class="restore-row"><span>Attachments</span><span>${(t.issue_attachments||[]).length}</span></div>
+              <div class="restore-row"><span>Embedded files (images &amp; docs)</span><span>${fileCount}</span></div>
+              <div class="restore-row"><span>Preferences</span><span>${(t.app_preferences||[]).length}</span></div>
+            </div>
+            <div style="padding:10px 14px;background:rgba(0,82,204,.06);border:1px solid rgba(0,82,204,.2);border-radius:var(--r-md);font-size:12px;color:var(--brand);margin-bottom:16px">
+              Restore is <strong>additive</strong>: existing records will be updated with values from the backup, and records not present in the backup will not be touched. No data will be deleted.
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-primary" id="restore-confirm-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.73"/></svg>
+                Restore Now
+              </button>
+              <button class="btn btn-secondary" id="restore-cancel-btn">Cancel</button>
+              <span style="font-size:12px;color:var(--text-3)">This cannot be undone — export a fresh backup first if unsure</span>
+            </div>`
+
+          document.getElementById('restore-cancel-btn').addEventListener('click', () => {
+            previewArea.style.display = 'none'
+            previewArea.innerHTML = ''
+            fileInput.value = ''
+          })
+
+          document.getElementById('restore-confirm-btn').addEventListener('click', () => {
+            doRestore(ev.target.result, file.size)
+          })
+        }
+        reader.readAsText(file)
+      }
+
+      // ── Send restore to server ────────────────────────────────────────────
+      async function doRestore(rawJson, fileSize) {
+        const previewArea = document.getElementById('restore-preview-area')
+        const resultArea  = document.getElementById('restore-result-area')
+
+        previewArea.innerHTML = `<div class="backup-progress">
+          <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity=".25"/><path d="M21 12a9 9 0 00-9-9"/></svg>
+          Restoring — writing to database and extracting files. Do not close this page…
+        </div>`
+
+        try {
+          const resp = await fetch('/api/backup/restore', {
+            method:  'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body:    rawJson,
+            credentials: 'include',
+          })
+          const data = await resp.json()
+          if (!resp.ok) throw new Error(data.error || 'Restore failed')
+
+          const s = data.stats || {}
+          previewArea.style.display = 'none'
+          resultArea.style.display  = 'block'
+          resultArea.innerHTML = `
+            <div class="backup-result-ok">
+              <div style="font-weight:700;color:var(--green);margin-bottom:10px;font-size:13px">✓ Restore complete</div>
+              <div class="restore-preview" style="margin-bottom:0">
+                <h5>Restored</h5>
+                <div class="restore-row"><span>Users</span><span>${s.users ?? 0}</span></div>
+                <div class="restore-row"><span>Projects</span><span>${s.projects ?? 0}</span></div>
+                <div class="restore-row"><span>Issues</span><span>${s.issues ?? 0}</span></div>
+                <div class="restore-row"><span>Comments</span><span>${s.comments ?? 0}</span></div>
+                <div class="restore-row"><span>Labels</span><span>${s.labels ?? 0}</span></div>
+                <div class="restore-row"><span>Attachments</span><span>${s.attachments ?? 0}</span></div>
+                <div class="restore-row"><span>Files written to disk</span><span>${s.files ?? 0}</span></div>
+              </div>
+              <div style="margin-top:12px;font-size:12px;color:var(--text-2)">
+                Source: ${esc(data.instance || 'unknown')} · Exported ${data.exported_at ? new Date(data.exported_at).toLocaleString() : ''}
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="location.reload()" style="margin-top:12px">Reload page</button>
+            </div>`
+        } catch (err) {
+          previewArea.style.display = 'none'
+          resultArea.style.display  = 'block'
+          resultArea.innerHTML = `<div class="backup-result-err"><strong>Restore failed</strong><br>${esc(err.message)}</div>`
+        }
       }
     }
 

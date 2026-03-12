@@ -259,6 +259,9 @@ function injectShell(opts = {}) {
 }
 
 function initMobileInteractions() {
+  // Wire theme picker now that the DOM elements exist
+  if (window._wireThemePicker) window._wireThemePicker()
+
   // ── Sidebar toggle ──────────────────────────────────────────────
   const sidebarToggle  = document.getElementById('sidebar-toggle')
   const sidebarClose   = document.getElementById('sidebar-close')
@@ -551,11 +554,12 @@ function globalModalsHTML() {
   // Apply immediately on load (no animation)
   applyTheme(getStored(), false)
 
-  // Wire up after DOM is ready
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn     = document.getElementById('theme-toggle-btn')
-    const picker  = document.getElementById('theme-picker')
-    if (!btn || !picker) return
+  // Wire up the theme picker — called both on DOMContentLoaded and after shell injection
+  function wireThemePicker() {
+    const btn    = document.getElementById('theme-toggle-btn')
+    const picker = document.getElementById('theme-picker')
+    if (!btn || !picker || btn._themeWired) return
+    btn._themeWired = true
 
     // Re-apply to update icons/active state after DOM exists
     applyTheme(getStored(), false)
@@ -585,5 +589,10 @@ function globalModalsHTML() {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       if (getStored() === 'system') applyTheme('system', true)
     })
-  })
+  }
+
+  // Wire up after DOM is ready (for pages that don't use injectShell)
+  document.addEventListener('DOMContentLoaded', wireThemePicker)
+  // Also expose so injectShell can call it immediately after injection
+  window._wireThemePicker = wireThemePicker
 })()

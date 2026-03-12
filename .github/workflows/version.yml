@@ -152,6 +152,58 @@ jobs:
           git commit -m "[skip ci] chore: bump version to ${{ steps.bump.outputs.new_version }}"
           git push origin HEAD:${{ steps.branch.outputs.name }}
 
+      - name: Cascade new base version to lower branches
+        if: github.event_name == 'pull_request'
+        run: |
+          BRANCH="${{ steps.branch.outputs.name }}"
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+
+          # Strip suffix to get the clean new base (e.g. 0.0.2 from 0.0.2-rc, 0.1.0 from 0.1.0)
+          NEW_BASE=$(echo "$NEW_VERSION" | sed 's/-dev\.[0-9]*//' | sed 's/-rc.*//')
+
+          # Determine which branches sit below the one we just bumped
+          if [[ "$BRANCH" == "main" ]]; then
+            DOWNSTREAM="staging develop"
+          elif [[ "$BRANCH" == "staging" ]]; then
+            DOWNSTREAM="develop"
+          else
+            DOWNSTREAM=""
+          fi
+
+          for TARGET in $DOWNSTREAM; do
+            echo "── Syncing base version to $TARGET ──"
+            git fetch origin $TARGET
+            git checkout $TARGET
+
+            CURRENT=$(cat .version | tr -d '[:space:]')
+
+            # Extract the existing dev number (if any) so we preserve it
+            if echo "$CURRENT" | grep -q '\-dev\.'; then
+              DEV_NUM=$(echo "$CURRENT" | sed 's/.*-dev\.//')
+              NEW_TARGET_VERSION="${NEW_BASE}-dev.${DEV_NUM}"
+            elif echo "$CURRENT" | grep -q '\-rc'; then
+              NEW_TARGET_VERSION="${NEW_BASE}-rc"
+            else
+              NEW_TARGET_VERSION="${NEW_BASE}"
+            fi
+
+            echo "$NEW_TARGET_VERSION" > .version
+
+            # Sync package.json too
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+              pkg.version = '${NEW_BASE}';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+
+            git add .version package.json
+            git diff --cached --quiet && echo "No changes needed on $TARGET" && continue
+            git commit -m "[skip ci] chore: sync base version to ${NEW_BASE} from ${BRANCH}"
+            git push origin HEAD:$TARGET
+            echo "Synced $TARGET → $NEW_TARGET_VERSION"
+          done
+
       - name: Create or replace Git tag
         run: |
           TAG="${{ steps.bump.outputs.tag }}"

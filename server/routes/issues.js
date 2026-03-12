@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
-const { canEditIssue, canEditOwnIssue, canEditIssueMeta, canUpdateIssueStatus, canDeleteComment } = require('../permissions')
+const { canEditIssue, canEditOwnIssue, canEditIssueMeta, canUpdateIssueStatus, canClaimIssue, canDeleteComment } = require('../permissions')
 
 router.use(requireAuth)
 
@@ -96,9 +96,10 @@ router.post('/', async (req, res) => {
     if (!project_id || !title?.trim())
       return res.status(400).json({ error: 'project_id and title are required.' })
 
-    const { rows: projects } = await db.query('SELECT id, key FROM projects WHERE id = $1', [project_id])
+    const { rows: projects } = await db.query('SELECT id, key, is_closed FROM projects WHERE id = $1', [project_id])
     if (!projects.length) return res.status(404).json({ error: 'Project not found' })
     const project = projects[0]
+    if (project.is_closed) return res.status(403).json({ error: 'This project is closed. No new issues can be created.' })
 
     // Atomic counter increment
     const { rows: [{ counter }] } = await db.query(
@@ -160,16 +161,21 @@ router.patch('/:id', async (req, res) => {
     const proj  = { id: issue.project_id, lead_id: issue.lead_id }
 
     // Determine what the request is trying to change
-    const META_FIELDS   = new Set(['priority', 'type'])
-    const STATUS_FIELDS = new Set(['status'])
+    const META_FIELDS     = new Set(['priority', 'type'])
+    const STATUS_FIELDS   = new Set(['status'])
+    const ASSIGNEE_FIELDS = new Set(['assignee_id'])
     const requestedFields = Object.keys(req.body).filter(k => req.body[k] !== undefined)
-    const isStatusOnlyUpdate = requestedFields.length > 0 && requestedFields.every(k => STATUS_FIELDS.has(k))
-    const touchesMeta    = requestedFields.some(k => META_FIELDS.has(k))
+    const isStatusOnlyUpdate   = requestedFields.length > 0 && requestedFields.every(k => STATUS_FIELDS.has(k))
+    const isAssigneeOnlyUpdate = requestedFields.length > 0 && requestedFields.every(k => ASSIGNEE_FIELDS.has(k))
+    const touchesMeta     = requestedFields.some(k => META_FIELDS.has(k))
 
     // Assignees may update status only
     if (isStatusOnlyUpdate) {
       if (!canUpdateIssueStatus(req.user, issue, proj))
         return res.status(403).json({ error: 'You must be the assignee, project lead, or admin to update this issue.' })
+    } else if (isAssigneeOnlyUpdate && canClaimIssue(req.user) && !canEditOwnIssue(req.user, issue, proj)) {
+      // Engineers (and above) can update assignee_id even if they're not the creator/lead/admin.
+      // Allow through — the field will be written below.
     } else {
       // All other edits require being the creator, lead, or admin
       if (!canEditOwnIssue(req.user, issue, proj))

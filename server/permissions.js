@@ -3,31 +3,36 @@
  * permissions.js
  *
  * Roles (ascending privilege):
- *   member  — view, create issues, comment, delete own comments,
- *             update status on issues assigned to them,
- *             edit/delete their own issues (title, desc, assignee, labels, dates)
- *   lead    — all member rights + manage projects they lead,
- *             full edit/delete any issue in their project (incl. priority & type)
- *   admin   — unrestricted
+ *   member    — view, create issues, comment, delete own comments,
+ *               update status on issues assigned to them,
+ *               edit their own issues (title, desc, labels, dates)
+ *   engineer — all member rights + can set/update assignee_id on any issue
+ *               (intended for picking up unassigned issues or reassigning to self)
+ *   lead      — all engineer rights + manage projects they lead,
+ *               full edit/delete any issue in their project (incl. priority & type)
+ *   admin     — unrestricted
  *
  * Helpers:
  *   isAdmin(user)                              → bool
  *   isLead(user)                               → bool (lead or admin)
+ *   isEngineer(user)                          → bool (engineer, lead, or admin)
  *   canManageProject(user, proj)               → bool (admin, or lead who leads the project)
  *   canEditIssue(user, proj)                   → bool (admin, or lead who leads that project)
  *   canEditOwnIssue(user, issue, proj)         → bool (above + creator of the issue)
  *   canEditIssueMeta(user, proj)               → bool (priority/type — leads/admins only)
  *   canUpdateIssueStatus(user, issue, proj)    → bool (above + assignee of the issue)
+ *   canClaimIssue(user)                        → bool (engineers, leads, admins can modify assignee)
  *   canDeleteComment(user, comment, proj)      → bool
  *   requireRole(minRole)                       → Express middleware
  */
 
-const ROLE_RANK = { member: 0, lead: 1, admin: 2 }
+const ROLE_RANK = { member: 0, engineer: 1, lead: 2, admin: 3 }
 
 function rank(role) { return ROLE_RANK[role] ?? 0 }
 
-function isAdmin(user) { return user?.role === 'admin' }
-function isLead(user)  { return rank(user?.role) >= rank('lead') }
+function isAdmin(user)     { return user?.role === 'admin' }
+function isLead(user)      { return rank(user?.role) >= rank('lead') }
+function isEngineer(user) { return rank(user?.role) >= rank('engineer') }
 
 /**
  * True if the user may create/edit/delete the given project.
@@ -80,6 +85,15 @@ function canUpdateIssueStatus(user, issue, proj) {
 }
 
 /**
+ * True if the user may set or change the assignee_id on an issue.
+ * Engineers (and above) can do this — intended for picking up unassigned
+ * issues or reassigning to themselves.
+ */
+function canClaimIssue(user) {
+  return isEngineer(user)
+}
+
+/**
  * True if the user may delete the given comment.
  * comment must have author_id. proj (optional) for lead scoping.
  */
@@ -101,4 +115,4 @@ function requireRole(minRole) {
   }
 }
 
-module.exports = { isAdmin, isLead, canManageProject, canEditIssue, canEditOwnIssue, canEditIssueMeta, canUpdateIssueStatus, canDeleteComment, requireRole, rank }
+module.exports = { isAdmin, isLead, isEngineer, canManageProject, canEditIssue, canEditOwnIssue, canEditIssueMeta, canUpdateIssueStatus, canClaimIssue, canDeleteComment, requireRole, rank }

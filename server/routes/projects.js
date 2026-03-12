@@ -25,6 +25,15 @@ async function getProject(id) {
 // ── GET /api/projects ─────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
+    // ?mine=true — only return projects the current user created or leads
+    const mine = req.query.mine === 'true'
+    const conditions = ['p.archived = FALSE']
+    const vals = []
+    if (mine) {
+      vals.push(req.user.id)
+      conditions.push(`(p.created_by = $${vals.length} OR p.lead_id = $${vals.length})`)
+    }
+    const where = conditions.join(' AND ')
     const { rows } = await db.query(`
       SELECT p.*, u.name as lead_name, u.initials as lead_initials, u.color as lead_color, u.avatar as lead_avatar,
         (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id
@@ -32,9 +41,9 @@ router.get('/', async (req, res) => {
         (SELECT COUNT(*)::int FROM issues i WHERE i.project_id = p.id) as total_issues
       FROM projects p
       LEFT JOIN users u ON u.id = p.lead_id
-      WHERE p.archived = FALSE
+      WHERE ${where}
       ORDER BY p.created_at DESC
-    `)
+    `, vals)
     res.json(rows)
   } catch (err) {
     console.error('projects list:', err.message)
@@ -55,9 +64,9 @@ router.post('/', requireRole('lead'), async (req, res) => {
 
     const id = uuidv4()
     await db.query(
-      `INSERT INTO projects (id, key, name, description, color, lead_id)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-      [id, keyUpper, name.trim(), description?.trim() || null, color || '#0052cc', lead_id || req.user.id]
+      `INSERT INTO projects (id, key, name, description, color, lead_id, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, keyUpper, name.trim(), description?.trim() || null, color || '#0052cc', lead_id || req.user.id, req.user.id]
     )
     await db.query('INSERT INTO issue_counters (project_id, counter) VALUES ($1, 0)', [id])
     const created = await getProject(id)
@@ -89,7 +98,7 @@ router.patch('/:id', async (req, res) => {
     if (!canManageProject(req.user, proj))
       return res.status(403).json({ error: 'Only admins or the project lead can edit this project.' })
 
-    const { name, key, description, color, lead_id, archived, icon } = req.body
+    const { name, key, description, color, lead_id, archived, icon, is_closed } = req.body
     const updates = {}
     if (name !== undefined)        updates.name        = name.trim()
     if (key !== undefined)         updates.key         = key.trim().toUpperCase()
@@ -97,6 +106,7 @@ router.patch('/:id', async (req, res) => {
     if (color !== undefined)       updates.color       = color
     if (lead_id !== undefined)     updates.lead_id     = lead_id
     if (archived !== undefined)    updates.archived    = Boolean(archived)
+    if (is_closed !== undefined)   updates.is_closed   = Boolean(is_closed)
 
     // Icon: save to disk if a new image is provided, delete file if explicitly cleared
     if (icon !== undefined) {

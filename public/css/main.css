@@ -481,6 +481,9 @@ select.form-control {
 }
 .topbar-menu-btn:hover { background: rgba(255,255,255,.1); }
 
+/* Hide sidebar close (X) button on desktop — sidebar is always visible there */
+#sidebar-close { display: none; }
+
 /* ── Mobile sidebar overlay ─────────────────────────────────────── */
 .sidebar-overlay {
   display: none;
@@ -523,6 +526,9 @@ select.form-control {
 
   /* Show hamburger button */
   .topbar-menu-btn { display: flex; }
+
+  /* Show sidebar close button in slide-in mode */
+  #sidebar-close { display: flex; }
 
   /* Hide the "Projects" nav button — redundant on mobile */
   .topbar-nav { display: none; }
