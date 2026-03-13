@@ -224,6 +224,9 @@
     })
     asnSel.addEventListener('change', e => { filters.assignee = e.target.value; fetchAndRender() })
 
+    // Initial load
+    fetchAndRender()
+
     // Create issue button (on this page, pre-fill project)
     document.getElementById('create-issue-page-btn')?.addEventListener('click', async () => {
       populateSelect(document.getElementById('ci-project'), [project], 'id', 'name')
