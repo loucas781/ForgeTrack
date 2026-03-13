@@ -1,6 +1,6 @@
 {
   "name": "forgetrack",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Self-hosted issue tracking — vanilla HTML/CSS/JS + Node.js/Express + SQLite",
   "main": "server/index.js",
   "scripts": {
