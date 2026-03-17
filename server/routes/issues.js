@@ -96,15 +96,21 @@ router.post('/', async (req, res) => {
     if (!project_id || !title?.trim())
       return res.status(400).json({ error: 'project_id and title are required.' })
 
-    // Check app preferences for required fields
+    // Check app preferences for required fields and limits
     const prefDb = require('../db/connection')
-    const { rows: prefRows } = await prefDb.query('SELECT key, value FROM app_preferences WHERE key IN ($1,$2)', ['require_assignee', 'require_due_date'])
+    const { rows: prefRows } = await prefDb.query(
+      'SELECT key, value FROM app_preferences WHERE key IN ($1,$2,$3,$4)',
+      ['require_assignee', 'require_due_date', 'max_description_chars', 'max_comment_chars']
+    )
     const prefMap = {}
     prefRows.forEach(r => { try { prefMap[r.key] = JSON.parse(r.value) } catch { prefMap[r.key] = r.value } })
     if (prefMap.require_assignee && !assignee_id)
       return res.status(400).json({ error: 'An assignee is required for new issues.' })
     if (prefMap.require_due_date && !due_date)
       return res.status(400).json({ error: 'A due date is required for new issues.' })
+    const maxDesc = prefMap.max_description_chars ? parseInt(prefMap.max_description_chars) : 5000
+    if (description && description.trim().length > maxDesc)
+      return res.status(400).json({ error: `Issue description exceeds the ${maxDesc.toLocaleString()} character limit.` })
 
     const { rows: projects } = await db.query('SELECT id, key, is_closed FROM projects WHERE id = $1', [project_id])
     if (!projects.length) return res.status(404).json({ error: 'Project not found' })
@@ -201,6 +207,16 @@ router.patch('/:id', async (req, res) => {
       if (req.body[k] !== undefined) updates[k] = req.body[k] === '' ? null : req.body[k]
     })
 
+    // Enforce description character limit
+    if (updates.description) {
+      const { rows: prefRows2 } = await db.query(
+        "SELECT value FROM app_preferences WHERE key = 'max_description_chars'"
+      )
+      const maxDesc = prefRows2.length ? (parseInt(prefRows2[0].value) || 0) : 5000
+      if (maxDesc > 0 && updates.description.length > maxDesc)
+        return res.status(400).json({ error: `Description exceeds the ${maxDesc.toLocaleString()} character limit.` })
+    }
+
     if (Object.keys(updates).length) {
       updates.updated_at = new Date()
       const keys = Object.keys(updates)
@@ -262,6 +278,14 @@ router.post('/:id/comments', async (req, res) => {
   try {
     const { body } = req.body
     if (!body?.trim()) return res.status(400).json({ error: 'Comment body is required.' })
+
+    // Enforce comment character limit from preferences
+    const { rows: commentPrefRows } = await db.query(
+      "SELECT value FROM app_preferences WHERE key = 'max_comment_chars'"
+    )
+    const maxComment = commentPrefRows.length ? (parseInt(JSON.parse(commentPrefRows[0].value)) || 2000) : 2000
+    if (body.trim().length > maxComment)
+      return res.status(400).json({ error: `Comment exceeds the ${maxComment.toLocaleString()} character limit.` })
 
     const { rows } = await db.query('SELECT id FROM issues WHERE id = $1', [req.params.id])
     if (!rows.length) return res.status(404).json({ error: 'Issue not found' })

@@ -1576,6 +1576,27 @@
             </select>
           </div>
 
+          <h3 class="section-title" style="margin-top:28px;margin-bottom:4px">Content Limits</h3>
+          <p class="text-2 text-sm" style="margin-bottom:20px">Set maximum character counts for issue descriptions and comments. Users see a live counter and cannot submit once the limit is reached. Set to 0 to disable the limit.</p>
+
+          <div class="pref-row">
+            <div class="pref-row-info">
+              <strong>Issue description limit</strong>
+              <span>Maximum number of characters allowed in an issue description. <em style="color:var(--brand)">Active: a live counter appears below the description field and submission is blocked when reached.</em></span>
+            </div>
+            <input type="number" class="form-control" id="pref-maxdesc" min="0" max="100000" step="100"
+              value="${prefs.max_description_chars ?? 5000}" style="width:110px;flex-shrink:0" />
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-row-info">
+              <strong>Comment limit</strong>
+              <span>Maximum number of characters allowed in a comment. <em style="color:var(--brand)">Active: a live counter appears below the comment field and submission is blocked when reached.</em></span>
+            </div>
+            <input type="number" class="form-control" id="pref-maxcomment" min="0" max="100000" step="100"
+              value="${prefs.max_comment_chars ?? 2000}" style="width:110px;flex-shrink:0" />
+          </div>
+
           <div style="margin-top:20px;display:flex;align-items:center;gap:12px">
             <button class="btn btn-primary" id="pref-save">Save Preferences</button>
             <span id="pref-saved" style="color:var(--green);font-size:13px;display:none">✓ Saved!</span>
@@ -1589,6 +1610,8 @@
               require_assignee:          document.getElementById('pref-requireassignee').checked,
               default_issue_type:        document.getElementById('pref-defaulttype').value,
               default_priority:          document.getElementById('pref-defaultpriority').value,
+              max_description_chars:     parseInt(document.getElementById('pref-maxdesc').value) || 0,
+              max_comment_chars:         parseInt(document.getElementById('pref-maxcomment').value) || 0,
             })
             const saved = document.getElementById('pref-saved')
             saved.style.display = 'inline'
