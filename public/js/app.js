@@ -638,6 +638,11 @@ async function applyCreateIssuePrefs() {
     typeSel?.addEventListener('change', () => { typeSel.dataset.userChanged = '1' }, { once: true })
     prioritySel?.addEventListener('change', () => { prioritySel.dataset.userChanged = '1' }, { once: true })
 
+    // ── Description character counter ────────────────────────────────────────
+    const descLimit = prefs.max_description_chars != null ? parseInt(prefs.max_description_chars) : 5000
+    const descTa    = document.getElementById('ci-desc')
+    if (descTa && descLimit > 0) attachCharCounter(descTa, descLimit)
+
   } catch (_) { /* non-fatal — backend will still validate */ }
 }
 
@@ -654,6 +659,70 @@ function validateCreateIssuePrefs() {
   if (dueInput?.getAttribute('data-require-due') && !dueInput.value) {
     toast('A due date is required for new issues.', 'error')
     dueInput.focus()
+    return false
+  }
+  return true
+}
+
+// ─── Character counter helper ─────────────────────────────────────────────────
+// Attaches a live counter below a textarea and enforces a hard limit.
+// Returns a cleanup function that removes the counter element.
+// If limit is 0 or falsy, does nothing and returns a no-op.
+function attachCharCounter(textarea, limit) {
+  if (!textarea || !limit) return () => {}
+
+  // Avoid double-attaching
+  const existing = textarea.parentElement?.querySelector('.char-counter')
+  if (existing) existing.remove()
+
+  const counter = document.createElement('div')
+  counter.className = 'char-counter'
+  counter.style.cssText = 'font-size:12px;text-align:right;margin-top:4px;color:var(--text-3);transition:color .15s'
+  textarea.parentElement.insertBefore(counter, textarea.nextSibling)
+
+  function update() {
+    const len  = textarea.value.length
+    const over = len > limit
+    counter.textContent = `${len.toLocaleString()} / ${limit.toLocaleString()}`
+    counter.style.color = over ? 'var(--red)' : len > limit * 0.9 ? 'var(--orange, #ff9800)' : 'var(--text-3)'
+    textarea.dataset.charOver = over ? '1' : ''
+  }
+
+  update()
+  textarea.addEventListener('input', update)
+  return () => { counter.remove(); textarea.removeEventListener('input', update) }
+}
+
+// ─── Apply comment char limit to a specific textarea ─────────────────────────
+// Call once after the comment textarea is in the DOM.
+async function applyCommentLimit(textareaId) {
+  try {
+    const prefs = await GET('/preferences')
+    const limit = prefs.max_comment_chars ? parseInt(prefs.max_comment_chars) : 2000
+    const ta = document.getElementById(textareaId)
+    if (ta && limit > 0) attachCharCounter(ta, limit)
+  } catch (_) { /* non-fatal */ }
+}
+
+// ─── Apply description char limit to a specific textarea ─────────────────────
+// Call once after the description textarea is in the DOM.
+// Returns the limit value (0 = disabled) so callers can use it inline too.
+async function applyDescLimit(textareaId) {
+  try {
+    const prefs = await GET('/preferences')
+    const limit = prefs.max_description_chars != null ? parseInt(prefs.max_description_chars) : 5000
+    const ta = document.getElementById(textareaId)
+    if (ta && limit > 0) attachCharCounter(ta, limit)
+    return limit
+  } catch (_) { return 0 }
+}
+
+// Returns false and shows a toast if the textarea is over its limit.
+function validateCharLimit(textareaId, label) {
+  const ta = document.getElementById(textareaId)
+  if (ta?.dataset.charOver === '1') {
+    toast(`${label} exceeds the character limit. Please shorten it before submitting.`, 'error')
+    ta.focus()
     return false
   }
   return true

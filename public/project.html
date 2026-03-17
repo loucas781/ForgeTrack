@@ -71,6 +71,7 @@
     document.getElementById('create-issue-form')?.addEventListener('submit', async e => {
       e.preventDefault()
       if (!validateCreateIssuePrefs()) return
+      if (!validateCharLimit('ci-desc', 'Description')) return
       try {
         const issue = await POST('/issues', {
           project_id:   document.getElementById('ci-project').value,

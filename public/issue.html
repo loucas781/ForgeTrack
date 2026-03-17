@@ -369,6 +369,7 @@
       // Submit comment
       document.getElementById('submit-comment-btn')?.addEventListener('click', async () => {
         const body = document.getElementById('comment-input').value.trim()
+        if (!validateCharLimit('comment-input', 'Comment')) return
         if (!body) return
         try {
           const c = await POST(`/issues/${issueId}/comments`, { body })
@@ -385,16 +386,26 @@
         const current = el.dataset.value || initialVal
         el.classList.add('inline-edit-active')
         el.innerHTML = multiline
-          ? `<textarea class="form-control" style="min-height:100px">${esc(current)}</textarea><div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" id="${elemId}-save">Save</button><button class="btn btn-secondary btn-sm" id="${elemId}-cancel">Cancel</button></div>`
+          ? `<textarea class="form-control" id="${elemId}-ta" style="min-height:100px">${esc(current)}</textarea><div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" id="${elemId}-save">Save</button><button class="btn btn-secondary btn-sm" id="${elemId}-cancel">Cancel</button></div>`
           : `<input class="form-control" type="text" value="${esc(current)}" /><div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" id="${elemId}-save">Save</button><button class="btn btn-secondary btn-sm" id="${elemId}-cancel">Cancel</button></div>`
+
+        // Attach live counter to multiline (description) inline editor
+        if (multiline) applyDescLimit(elemId + '-ta')
 
         document.getElementById(elemId + '-cancel').addEventListener('click', () => {
           el.classList.remove('inline-edit-active')
           el.innerHTML = (el.dataset.value || initialVal) + `<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
         })
         document.getElementById(elemId + '-save').addEventListener('click', async () => {
-          const val = (multiline ? el.querySelector('textarea') : el.querySelector('input')).value.trim()
+          const field = multiline ? el.querySelector('textarea') : el.querySelector('input')
+          const val = field.value.trim()
           if (!val) return
+          // Block save if over the character limit
+          if (field.dataset.charOver === '1') {
+            toast('Description exceeds the character limit. Please shorten it before saving.', 'error')
+            field.focus()
+            return
+          }
           try {
             await onSave(val)
             el.dataset.value = val
@@ -408,6 +419,9 @@
 
     render(issue)
 
+    // Attach live character counter to comment textarea
+    applyCommentLimit('comment-input')
+
     // Wire create issue btn from topbar
     document.getElementById('create-issue-btn')?.addEventListener('click', async () => {
       const projs = await GET('/projects')
@@ -420,6 +434,7 @@
     document.getElementById('create-issue-form')?.addEventListener('submit', async e => {
       e.preventDefault()
       if (!validateCreateIssuePrefs()) return
+      if (!validateCharLimit('ci-desc', 'Description')) return
       try {
         const iss2 = await POST('/issues', { project_id: document.getElementById('ci-project').value, title: document.getElementById('ci-title').value.trim(), description: document.getElementById('ci-desc').value.trim(), type: document.getElementById('ci-type').value, status: document.getElementById('ci-status').value, priority: document.getElementById('ci-priority').value, assignee_id: document.getElementById('ci-assignee').value||null, story_points: parseInt(document.getElementById('ci-points').value)||null, due_date: document.getElementById('ci-due').value||null, labels: document.getElementById('ci-labels').value.split(',').map(l=>l.trim()).filter(Boolean) })
         closeModal('create-issue-modal')
