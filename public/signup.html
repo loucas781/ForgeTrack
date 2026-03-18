@@ -74,6 +74,8 @@
       <button type="submit" class="btn btn-primary btn-lg auth-submit" id="submit-btn">Create Account</button>
       <p class="auth-switch">Already have an account? <a href="/login.html">Sign in</a></p>
     </form>
+
+    <p id="version-footer" class="auth-version-footer">ForgeTrack</p>
   </div>
 
   <script>
@@ -84,6 +86,19 @@
 
     // Load config (gets password policy) then check signup status
     loadConfig().then(cfg => {
+      // ── Version footer ──────────────────────────────────────────────────────
+      const v       = cfg.version || '0.0.1'
+      const env     = cfg.appEnv  || 'development'
+      const isDev   = v.includes('-dev.'), isRC = v.includes('-rc')
+      const base    = v.split('-')[0]
+      const devNum  = isDev ? v.split('-dev.')[1] : null
+      const tag     = isDev ? `v${base}-dev.${devNum}` : isRC ? `v${base}-rc` : `v${base}`
+      const badgeCls = isDev ? 'badge-dev' : isRC ? 'badge-rc' : 'badge-prod'
+      const footer  = document.getElementById('version-footer')
+      if (footer) {
+        footer.innerHTML = `ForgeTrack &middot; <span class="auth-env-badge ${badgeCls}">${env}</span> &middot; ${tag}`
+        footer.style.opacity = '1'
+      }
       if (cfg.allowSignup === false) {
           document.getElementById('signup-form').innerHTML = `
             <div style="text-align:center;padding:16px 0">

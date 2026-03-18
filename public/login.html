@@ -14,7 +14,6 @@
 <body class="auth-page">
   <div class="auth-bg"></div>
 
-  <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:440px">
   <div class="auth-card">
     <div class="auth-logo">
       <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
@@ -62,10 +61,9 @@
 
       <p class="auth-switch" style="display:none">Don't have an account? <a href="/signup.html">Create one</a></p>
     </form>
-  </div>
 
-  <p id="version-footer" style="margin-top:16px;font-size:12px;color:var(--text-3);text-align:center;opacity:0;transition:opacity .3s;width:100%">ForgeTrack</p>
-  </div><!-- /auth-wrapper -->
+    <p id="version-footer" class="auth-version-footer">ForgeTrack</p>
+  </div>
 
   <script>
     // Redirect to dashboard only if session is confirmed valid
@@ -126,10 +124,10 @@
         const base   = v.split('-')[0]
         const devNum = isDev ? v.split('-dev.')[1] : null
         const tag    = isDev ? `v${base}-dev.${devNum}` : isRC ? `v${base}-rc` : `v${base}`
-        const color  = isDev ? 'var(--orange, #ff9800)' : isRC ? 'var(--brand, #0052cc)' : 'var(--green, #00875a)'
+        const badgeCls = isDev ? 'badge-dev' : isRC ? 'badge-rc' : 'badge-prod'
         const footer = document.getElementById('version-footer')
         if (footer) {
-          footer.innerHTML = `ForgeTrack &middot; <span style="color:${color};font-weight:600">${env}</span> &middot; <span style="color:${color};font-weight:600">${tag}</span>`
+          footer.innerHTML = `ForgeTrack &middot; <span class="auth-env-badge ${badgeCls}">${env}</span> &middot; ${tag}`
           footer.style.opacity = '1'
         }
       }).catch(() => {})
