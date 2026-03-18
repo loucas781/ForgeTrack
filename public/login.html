@@ -14,7 +14,6 @@
 <body class="auth-page">
   <div class="auth-bg"></div>
 
-  <div class="auth-wrapper">
   <div class="auth-card">
     <div class="auth-logo">
       <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
@@ -62,10 +61,9 @@
 
       <p class="auth-switch" style="display:none">Don't have an account? <a href="/signup.html">Create one</a></p>
     </form>
-  </div>
 
-  <p id="version-footer" class="auth-version-footer">ForgeTrack</p>
-  </div><!-- /auth-wrapper -->
+    <p id="version-footer" class="auth-version-footer">ForgeTrack</p>
+  </div>
 
   <script>
     // Redirect to dashboard only if session is confirmed valid
@@ -129,7 +127,7 @@
         const badgeCls = isDev ? 'badge-dev' : isRC ? 'badge-rc' : 'badge-prod'
         const footer = document.getElementById('version-footer')
         if (footer) {
-          footer.innerHTML = `ForgeTrack &middot; <span class="auth-env-badge ${badgeCls}">${env}</span> &middot; <span class="auth-env-badge ${badgeCls}">${tag}</span>`
+          footer.innerHTML = `ForgeTrack &middot; <span class="auth-env-badge ${badgeCls}">${env}</span> &middot; ${tag}`
           footer.style.opacity = '1'
         }
       }).catch(() => {})
