@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid')
 const db     = require('../db/connection')
 const { requireAuth } = require('../middleware/auth')
 const audit  = require('../audit')
+const events = require('../events')
 const { canEditIssue, canEditOwnIssue, canEditIssueMeta, canUpdateIssueStatus, canClaimIssue, canDeleteComment } = require('../permissions')
 
 router.use(requireAuth)
@@ -147,6 +148,7 @@ router.post('/', async (req, res) => {
 
     const created = await getIssue(id)
     audit(req.user.id, 'issue.create', 'issue', id, `${issueKey}: ${title.trim()}`)
+    events.broadcastProject(project_id, 'issue.create', { id, key: issueKey })
     res.status(201).json(created)
   } catch (err) {
     console.error('issue create:', err.message)
@@ -245,6 +247,8 @@ router.patch('/:id', async (req, res) => {
       audit(req.user.id, 'issue.update', 'issue', req.params.id,
         `${updated.key}: ${updated.title}`,
         changedFields.length ? { changed: changedFields } : { changed: ['labels'] })
+      events.broadcastProject(updated.project_id, 'issue.update', { id: req.params.id, key: updated.key })
+      events.broadcastIssue(req.params.id, 'issue.update', { changed: changedFields })
     }
     res.json(updated)
   } catch (err) {
@@ -267,6 +271,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'You can only delete issues you created, or you must be the project lead or admin.' })
     await db.query('DELETE FROM issues WHERE id = $1', [req.params.id])
     audit(req.user.id, 'issue.delete', 'issue', issue.id, `${issue.key}: ${issue.title}`)
+    events.broadcastProject(issue.project_id, 'issue.delete', { id: issue.id, key: issue.key })
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
@@ -302,6 +307,7 @@ router.post('/:id/comments', async (req, res) => {
       FROM comments c LEFT JOIN users u ON u.id = c.author_id WHERE c.id = $1
     `, [id])
     audit(req.user.id, 'comment.create', 'issue', req.params.id, null, { preview: body.trim().slice(0, 80) })
+    events.broadcastIssue(req.params.id, 'comment.create', { commentId: id })
     res.status(201).json(comment)
   } catch (err) {
     console.error('comment create:', err.message)
@@ -327,6 +333,7 @@ router.delete('/:id/comments/:cid', async (req, res) => {
       return res.status(403).json({ error: "You don't have permission to delete this comment." })
     await db.query('DELETE FROM comments WHERE id = $1', [req.params.cid])
     audit(req.user.id, 'comment.delete', 'issue', req.params.id, null, { preview: comment.body.slice(0, 80) })
+    events.broadcastIssue(req.params.id, 'comment.delete', { commentId: req.params.cid })
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
@@ -432,6 +439,99 @@ router.delete('/:id/attachments/:aid', requireAuth, async (req, res) => {
     await db.query('DELETE FROM issue_attachments WHERE id = $1', [req.params.aid])
     res.json({ ok: true })
   } catch { res.status(500).json({ error: 'Server error' }) }
+})
+
+// ── GET /api/issues/:id/activity ──────────────────────────────────────────────
+router.get('/:id/activity', async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT a.id, a.action, a.meta, a.created_at,
+             u.name as actor_name, u.initials as actor_initials,
+             u.color as actor_color, u.avatar as actor_avatar
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.actor_id
+      WHERE a.entity_id = $1
+      ORDER BY a.created_at ASC
+    `, [req.params.id])
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── GET /api/issues/:id/links ─────────────────────────────────────────────────
+router.get('/:id/links', async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT l.id, l.type, l.created_at,
+             ti.id as target_id, ti.key as target_key, ti.title as target_title,
+             ti.status as target_status, ti.type as target_type
+      FROM issue_links l
+      JOIN issues ti ON ti.id = l.target_id
+      WHERE l.source_id = $1
+      UNION ALL
+      SELECT l.id, l.type, l.created_at,
+             si.id as target_id, si.key as target_key, si.title as target_title,
+             si.status as target_status, si.type as target_type
+      FROM issue_links l
+      JOIN issues si ON si.id = l.source_id
+      WHERE l.target_id = $1
+      ORDER BY created_at ASC
+    `, [req.params.id])
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/issues/:id/links ────────────────────────────────────────────────
+router.post('/:id/links', async (req, res) => {
+  try {
+    const { targetKey, type } = req.body
+    const VALID_TYPES = ['blocks','blocked_by','relates_to','duplicate_of']
+    if (!targetKey || !VALID_TYPES.includes(type))
+      return res.status(400).json({ error: 'targetKey and valid type are required.' })
+
+    const { rows: [target] } = await db.query(
+      'SELECT id FROM issues WHERE key = $1', [targetKey.toUpperCase().trim()]
+    )
+    if (!target) return res.status(404).json({ error: 'Target issue not found.' })
+    if (target.id === req.params.id)
+      return res.status(400).json({ error: 'Cannot link an issue to itself.' })
+
+    const id = uuidv4()
+    await db.query(
+      'INSERT INTO issue_links (id, source_id, target_id, type, created_by) VALUES ($1,$2,$3,$4,$5)',
+      [id, req.params.id, target.id, type, req.user.id]
+    )
+    res.status(201).json({ id })
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'This link already exists.' })
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── DELETE /api/issues/:id/links/:lid ─────────────────────────────────────────
+router.delete('/:id/links/:lid', async (req, res) => {
+  try {
+    const { rows: [link] } = await db.query(
+      `SELECT l.created_by, p.lead_id, i.project_id
+       FROM issue_links l
+       JOIN issues i ON i.id = l.source_id
+       JOIN projects p ON p.id = i.project_id
+       WHERE l.id = $1 AND (l.source_id = $2 OR l.target_id = $2)`,
+      [req.params.lid, req.params.id]
+    )
+    if (!link) return res.status(404).json({ error: 'Link not found.' })
+    const canDelete = req.user.role === 'admin'
+      || req.user.id === link.lead_id
+      || req.user.id === link.created_by
+    if (!canDelete) return res.status(403).json({ error: 'Not authorised to remove this link.' })
+    await db.query('DELETE FROM issue_links WHERE id = $1', [req.params.lid])
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' })
+  }
 })
 
 module.exports = router

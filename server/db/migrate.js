@@ -198,6 +198,22 @@ async function migrate() {
         updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
+      -- ── Passkeys (WebAuthn credentials) ───────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS passkeys (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        credential_id   TEXT NOT NULL UNIQUE,
+        public_key      TEXT NOT NULL,
+        counter         BIGINT NOT NULL DEFAULT 0,
+        device_type     TEXT,
+        backed_up       BOOLEAN NOT NULL DEFAULT FALSE,
+        transports      TEXT NOT NULL DEFAULT '[]',
+        name            TEXT NOT NULL DEFAULT 'Passkey',
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_passkeys_user ON passkeys(user_id);
+      CREATE INDEX IF NOT EXISTS idx_passkeys_cred ON passkeys(credential_id);
+
       -- ── Audit log ──────────────────────────────────────────────────────────
       CREATE TABLE IF NOT EXISTS audit_log (
         id          TEXT PRIMARY KEY,
@@ -212,6 +228,22 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_audit_actor    ON audit_log(actor_id);
       CREATE INDEX IF NOT EXISTS idx_audit_created  ON audit_log(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_audit_entity   ON audit_log(entity_type, entity_id);
+
+      -- ── Issue links ────────────────────────────────────────────────────────
+      CREATE TABLE IF NOT EXISTS issue_links (
+        id         TEXT PRIMARY KEY,
+        source_id  TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+        target_id  TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+        type       TEXT NOT NULL CHECK (type IN ('blocks','blocked_by','relates_to','duplicate_of')),
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_issue_links_source ON issue_links(source_id);
+      CREATE INDEX IF NOT EXISTS idx_issue_links_target ON issue_links(target_id);
+
+      -- ── Add incident type to issues ────────────────────────────────────────
+      ALTER TABLE issues DROP CONSTRAINT IF EXISTS issues_type_check;
+      ALTER TABLE issues ADD CONSTRAINT issues_type_check CHECK (type IN ('bug','task','story','epic','incident'));
 
     `)
     console.log('✓ PostgreSQL schema ready')

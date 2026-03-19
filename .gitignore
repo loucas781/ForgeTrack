@@ -22,3 +22,7 @@ data/
 # User-uploaded files — stored on disk, never committed
 # Back these up separately (e.g. rsync, Proxmox snapshot)
 uploads/
+
+# Claude Code — local AI assistant files, never commit these
+.claude/
+CLAUDE.md

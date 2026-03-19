@@ -233,10 +233,39 @@ app.get('/api/audit', requireAuth, async (req, res) => {
 })
 
 // ── API Routes ─────────────────────────────────────────────────────────────────
-app.use('/api/auth',     require('./routes/auth'))
-app.use('/api/projects', require('./routes/projects'))
-app.use('/api/issues',   require('./routes/issues'))
-app.use('/api/users',    require('./routes/users'))
+app.use('/api/auth',         require('./routes/auth'))
+app.use('/api/auth/passkey', require('./routes/passkeys'))
+app.use('/api/projects',     require('./routes/projects'))
+app.use('/api/issues',       require('./routes/issues'))
+app.use('/api/users',        require('./routes/users'))
+
+// ── GET /api/events — Server-Sent Events (project or issue scope) ─────────────
+const events = require('./events')
+app.get('/api/events', requireAuth, (req, res) => {
+  const { projectId, issueId } = req.query
+  if (!projectId && !issueId)
+    return res.status(400).json({ error: 'projectId or issueId required' })
+
+  res.set({
+    'Content-Type':      'text/event-stream',
+    'Cache-Control':     'no-cache',
+    'Connection':        'keep-alive',
+    'X-Accel-Buffering': 'no',
+  })
+  res.flushHeaders()
+  res.write(': connected\n\n')
+
+  let unsubscribe
+  if (issueId) {
+    unsubscribe = events.subscribeIssue(issueId, res)
+  } else {
+    unsubscribe = events.subscribeProject(projectId, res)
+  }
+
+  // Heartbeat every 25 s to keep the connection alive through proxies
+  const hb = setInterval(() => { try { res.write(': ping\n\n') } catch (_) {} }, 25000)
+  req.on('close', () => { clearInterval(hb); unsubscribe() })
+})
 
 // Backup restore needs raw text body (the .ftbackup JSON file)
 app.use('/api/backup/restore', express.text({ limit: '256mb', type: '*/*' }))

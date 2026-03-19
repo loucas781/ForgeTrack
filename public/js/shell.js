@@ -155,16 +155,18 @@ function buildTopbarHTML() {
 function buildProjectSidebarHTML(project, activePage) {
   const pid = project.id
   const links = [
-    { href: `/project.html?id=${pid}&view=issues`,   icon: 'list',     label: 'Issues',           match: 'issues'   },
-    { href: `/project.html?id=${pid}&view=backlog`,  icon: 'layers',   label: 'Backlog',          match: 'backlog'  },
-    { href: `/project.html?id=${pid}&view=bugs`,     icon: 'bug',      label: 'Bug Reports',      match: 'bugs'     },
-    { href: `/reports.html?id=${pid}`,               icon: 'chart',    label: 'Reports',          match: 'reports'  },
-    { href: `/project.html?id=${pid}&view=settings`, icon: 'settings', label: 'Project Settings', match: 'settings' },
+    { href: `/project.html?id=${pid}&view=issues`,    icon: 'list',     label: 'Issues',           match: 'issues'    },
+    { href: `/project.html?id=${pid}&view=backlog`,   icon: 'layers',   label: 'Backlog',          match: 'backlog'   },
+    { href: `/project.html?id=${pid}&view=bugs`,      icon: 'bug',      label: 'Bug Reports',      match: 'bugs'      },
+    { href: `/project.html?id=${pid}&view=incidents`, icon: 'incident', label: 'Incidents',        match: 'incidents' },
+    { href: `/reports.html?id=${pid}`,                icon: 'chart',    label: 'Reports',          match: 'reports'   },
+    { href: `/project.html?id=${pid}&view=settings`,  icon: 'settings', label: 'Project Settings', match: 'settings'  },
   ]
   const icons = {
     list:     '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>',
     layers:   '<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>',
     bug:      '<path d="M8 6l4-4 4 4M16 11V8M8 11V8M3 12h2.5M18.5 12H21M5 18l2.5-2.5M19 18l-2.5-2.5M12 22V12M12 12a4 4 0 100-8 4 4 0 000 8z"/>',
+    incident: '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
     chart:    '<path d="M18 20V10M12 20V4M6 20v-6"/>',
     settings: '<path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>',
   }
@@ -191,11 +193,11 @@ function buildProjectSidebarHTML(project, activePage) {
 
       <nav class="sidebar-nav">
         <div class="sidebar-section-label">Planning</div>
-        ${links.slice(0,3).map(l => `<a href="${l.href}" class="sidebar-link${activePage===l.match?' active':''}">${svgIcon(l.icon)} ${l.label}</a>`).join('')}
+        ${links.slice(0,4).map(l => `<a href="${l.href}" class="sidebar-link${activePage===l.match?' active':''}">${svgIcon(l.icon)} ${l.label}</a>`).join('')}
         <div class="sidebar-section-label">Insights</div>
-        <a href="${links[3].href}" class="sidebar-link${activePage==='reports'?' active':''}">${svgIcon('chart')} Reports</a>
+        <a href="${links[4].href}" class="sidebar-link${activePage==='reports'?' active':''}">${svgIcon('chart')} Reports</a>
         <div class="sidebar-section-label">Project</div>
-        <a href="${links[4].href}" class="sidebar-link${activePage==='settings'?' active':''}">${svgIcon('settings')} Project Settings</a>
+        <a href="${links[5].href}" class="sidebar-link${activePage==='settings'?' active':''}">${svgIcon('settings')} Project Settings</a>
       </nav>
     </aside>`
 }
@@ -414,6 +416,7 @@ function globalModalsHTML() {
                 <select class="form-control" id="ci-type">
                   <option value="task">Task</option><option value="bug">Bug</option>
                   <option value="story">Story</option><option value="epic">Epic</option>
+                  <option value="incident">Incident</option>
                 </select>
               </div>
             </div>
@@ -563,9 +566,14 @@ function globalModalsHTML() {
     })
   }
 
+  const THEME_LABELS = { system: 'System', light: 'Light', dark: 'Dark', oled: 'OLED' }
+
   function saveAndApply(choice, animate) {
     try { localStorage.setItem(STORAGE_KEY, choice) } catch {}
     applyTheme(choice, animate)
+    if (animate && typeof toast === 'function') {
+      toast('Theme: ' + (THEME_LABELS[choice] || choice), 'success')
+    }
   }
 
   // Apply immediately on load (no animation)

@@ -4,7 +4,7 @@
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_LABELS   = { todo:'To Do', inprogress:'In Progress', review:'In Review', done:'Done', cancelled:'Cancelled' }
 const PRIORITY_LABELS = { critical:'Critical', high:'High', medium:'Medium', low:'Low', trivial:'Trivial' }
-const TYPE_LABELS     = { bug:'Bug', task:'Task', story:'Story', epic:'Epic' }
+const TYPE_LABELS     = { bug:'Bug', task:'Task', story:'Story', epic:'Epic', incident:'Incident' }
 const PROJECT_COLORS  = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 const AVATAR_COLORS   = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff','#172b4d','#42526e']
 
@@ -442,18 +442,68 @@ async function initTopbar() {
 function issueRowHtml(issue) {
   const assignee = issue.assignee_id ? { name: issue.assignee_name, initials: issue.assignee_initials, color: issue.assignee_color, avatar: issue.assignee_avatar } : null
   return `
-    <a class="issue-row" href="/issue.html?id=${issue.id}">
-      ${typeIcon(issue.type)}
-      ${priorityIcon(issue.priority)}
-      <span class="ir-key mono">${esc(issue.key)}</span>
-      <span class="ir-title">${esc(issue.title)}${issue.labels?.length ? `<span style="margin-left:6px">${issue.labels.map(l=>`<span class="label-chip">${esc(l)}</span>`).join(' ')}</span>` : ''}</span>
-      <span class="ir-meta">
-        ${statusBadge(issue.status)}
-        ${issue.comment_count > 0 ? `<span class="ir-meta-item">💬 ${issue.comment_count}</span>` : ''}
-        <span class="ir-meta-item">${fmtRelative(issue.updated_at)}</span>
-        ${assignee ? avatarHtml(assignee, 22) : ''}
-      </span>
-    </a>`
+    <div class="issue-row-wrap">
+      <a class="issue-row" href="/issue.html?id=${issue.id}">
+        ${typeIcon(issue.type)}
+        ${priorityIcon(issue.priority)}
+        <span class="ir-key mono">${esc(issue.key)}</span>
+        <span class="ir-title">${esc(issue.title)}${issue.labels?.length ? `<span style="margin-left:6px">${issue.labels.map(l=>`<span class="label-chip">${esc(l)}</span>`).join(' ')}</span>` : ''}</span>
+        <span class="ir-meta">
+          ${statusBadge(issue.status)}
+          ${issue.comment_count > 0 ? `<span class="ir-meta-item">💬 ${issue.comment_count}</span>` : ''}
+          <span class="ir-meta-item">${fmtRelative(issue.updated_at)}</span>
+          ${assignee ? avatarHtml(assignee, 22) : ''}
+        </span>
+      </a>
+      <button class="ir-actions-btn" title="Quick actions" data-id="${esc(issue.id)}" onclick="toggleIssueActionsMenu(event,this,'${esc(issue.id)}','${esc(issue.status)}')">···</button>
+    </div>`
+}
+
+// ─── Row-level quick actions ──────────────────────────────────────────────────
+const STATUS_OPTIONS = [
+  { value: 'todo',       label: 'To Do' },
+  { value: 'inprogress', label: 'In Progress' },
+  { value: 'review',     label: 'Review' },
+  { value: 'done',       label: 'Done' },
+  { value: 'cancelled',  label: 'Cancelled' },
+]
+
+function toggleIssueActionsMenu(e, btn, issueId, currentStatus) {
+  e.preventDefault()
+  e.stopPropagation()
+  document.querySelectorAll('.ir-actions-menu').forEach(m => m.remove())
+
+  const menu = document.createElement('div')
+  menu.className = 'ir-actions-menu'
+  const statusItems = STATUS_OPTIONS
+    .filter(s => s.value !== currentStatus)
+    .map(s => `<button class="ir-menu-item" data-action="status" data-value="${s.value}">Set: ${s.label}</button>`)
+    .join('')
+  menu.innerHTML = statusItems
+  document.body.appendChild(menu)
+
+  const r = btn.getBoundingClientRect()
+  menu.style.top  = `${r.bottom + window.scrollY + 4}px`
+  menu.style.left = `${r.right  + window.scrollX - menu.offsetWidth}px`
+
+  menu.querySelectorAll('[data-action="status"]').forEach(item => {
+    item.addEventListener('click', async () => {
+      menu.remove()
+      try {
+        await PATCH(`/issues/${issueId}`, { status: item.dataset.value })
+        // Re-render this row in place by dispatching a custom event the project page can catch
+        document.dispatchEvent(new CustomEvent('issueRowUpdated', { detail: { id: issueId } }))
+        toast('Status updated', 'success')
+      } catch (err) {
+        toast(err.message || 'Failed to update status', 'error')
+      }
+    })
+  })
+
+  const close = e2 => {
+    if (!menu.contains(e2.target) && e2.target !== btn) { menu.remove(); document.removeEventListener('click', close) }
+  }
+  setTimeout(() => document.addEventListener('click', close), 0)
 }
 
 // ─── Render grouped issues ────────────────────────────────────────────────────
@@ -727,3 +777,66 @@ function validateCharLimit(textareaId, label) {
   }
   return true
 }
+
+// ─── Keyboard shortcuts ────────────────────────────────────────────────────────
+;(function initKeyboardShortcuts() {
+  let lastKey = null, lastKeyTime = 0
+
+  function showShortcutHelp() {
+    if (document.getElementById('shortcut-help-overlay')) {
+      document.getElementById('shortcut-help-overlay').remove()
+      return
+    }
+    const overlay = document.createElement('div')
+    overlay.id = 'shortcut-help-overlay'
+    overlay.innerHTML = `
+      <div class="shortcut-help-modal">
+        <div class="shortcut-help-header">
+          <span>Keyboard Shortcuts</span>
+          <button onclick="document.getElementById('shortcut-help-overlay').remove()" title="Close">✕</button>
+        </div>
+        <div class="shortcut-help-body">
+          <div class="shortcut-row"><kbd>N</kbd><span>New issue (project page)</span></div>
+          <div class="shortcut-row"><kbd>?</kbd><span>Toggle this help</span></div>
+          <div class="shortcut-row"><kbd>Esc</kbd><span>Close modal / dropdown</span></div>
+          <div class="shortcut-row"><kbd>G</kbd> then <kbd>H</kbd><span>Go to home</span></div>
+          <div class="shortcut-row"><kbd>G</kbd> then <kbd>P</kbd><span>Go to projects</span></div>
+        </div>
+      </div>`
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+    document.body.appendChild(overlay)
+  }
+
+  window.showShortcutHelp = showShortcutHelp
+
+  document.addEventListener('keydown', e => {
+    const tag = (e.target?.tagName || '').toUpperCase()
+    if (['INPUT','TEXTAREA','SELECT'].includes(tag) || e.target?.isContentEditable) return
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+
+    const key  = e.key
+    const now  = Date.now()
+    const chord = lastKey && (now - lastKeyTime) < 1500
+
+    // G + H → go home, G + P → go to projects
+    if (chord && lastKey === 'g') {
+      if (key === 'h') { lastKey = null; window.location.href = '/'; return }
+      if (key === 'p') { lastKey = null; window.location.href = '/'; return }
+    }
+
+    if (key === '?') { e.preventDefault(); showShortcutHelp(); lastKey = null; return }
+
+    if (key === 'n' || key === 'N') {
+      // Let project.html expose a hook for the N shortcut
+      if (typeof window._openNewIssue === 'function') { e.preventDefault(); window._openNewIssue(); lastKey = null; return }
+    }
+
+    if (key === 'Escape') {
+      document.getElementById('shortcut-help-overlay')?.remove()
+      document.querySelectorAll('.ir-actions-menu').forEach(m => m.remove())
+    }
+
+    lastKey = key.toLowerCase()
+    lastKeyTime = now
+  })
+})()

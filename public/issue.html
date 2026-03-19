@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/main.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <style>
     .issue-layout { display:grid; grid-template-columns:1fr 300px; gap:32px; align-items:start; }
     @media(max-width:900px){ .issue-layout{grid-template-columns:1fr} }
@@ -18,7 +20,30 @@
     .comment-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
     .comment-author { font-weight:600; font-size:13px; }
     .comment-time { margin-left:auto; font-size:11px; color:var(--text-3); }
-    .comment-text { font-size:13px; line-height:1.6; white-space:pre-wrap; }
+    .comment-text { font-size:13px; line-height:1.6; }
+    .md-body h1,.md-body h2,.md-body h3 { margin:.6em 0 .3em; font-weight:600; }
+    .md-body h1 { font-size:1.2em } .md-body h2 { font-size:1.1em } .md-body h3 { font-size:1em }
+    .md-body p { margin:.4em 0; }
+    .md-body ul,.md-body ol { padding-left:1.4em; margin:.3em 0; }
+    .md-body code { background:var(--gray-100,rgba(0,0,0,.06)); padding:1px 5px; border-radius:3px; font-family:'IBM Plex Mono',monospace; font-size:.9em; }
+    .md-body pre { background:var(--gray-100,rgba(0,0,0,.06)); padding:12px; border-radius:var(--r-md); overflow-x:auto; margin:.4em 0; }
+    .md-body pre code { background:none; padding:0; }
+    .md-body blockquote { border-left:3px solid var(--border-2); padding-left:12px; color:var(--text-3); margin:.4em 0; }
+    .md-body a { color:var(--brand); }
+    .md-body > *:first-child { margin-top:0 } .md-body > *:last-child { margin-bottom:0 }
+    .md-toolbar { display:flex; gap:4px; margin-bottom:6px; }
+    .md-toolbar button { padding:3px 7px; font-size:12px; border-radius:var(--r-sm); border:1px solid var(--border-2); background:var(--surface); color:var(--text-2); cursor:pointer; font-family:'IBM Plex Mono',monospace; }
+    .md-toolbar button:hover { background:var(--gray-50); }
+    .md-preview-toggle { font-size:12px; color:var(--brand); cursor:pointer; margin-left:auto; background:none; border:none; padding:3px 7px; }
+    .link-section { margin-top:12px; }
+    .link-item { display:flex; align-items:center; gap:8px; padding:4px 0; font-size:13px; border-bottom:1px solid var(--border-2); }
+    .link-item:last-child { border-bottom:none; }
+    .link-type-badge { font-size:10px; font-weight:600; text-transform:uppercase; padding:1px 5px; border-radius:3px; background:var(--gray-50); color:var(--text-3); border:1px solid var(--border-2); white-space:nowrap; }
+    .link-add-form { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+    .activity-entry { display:flex; gap:10px; align-items:flex-start; padding:6px 0; border-bottom:1px solid var(--border-2); }
+    .activity-entry:last-child { border-bottom:none; }
+    .activity-line { font-size:13px; line-height:1.4; flex:1; }
+    .activity-time { font-size:11px; color:var(--text-3); white-space:nowrap; }
     .comment-delete { opacity:0; transition:opacity var(--t-fast); }
     .comment:hover .comment-delete { opacity:1; }
     .inline-edit-active textarea, .inline-edit-active input { width:100%; }
@@ -115,7 +140,7 @@
               <!-- Description -->
               <section style="margin-bottom:32px">
                 <h4 style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border-2);padding-bottom:8px;margin-bottom:12px">Description</h4>
-                <div class="${canEditContent ? 'inline-edit' : ''}" id="desc-edit" style="font-size:14px;line-height:1.6;color:var(--text-2);white-space:pre-wrap;min-height:40px" ${canEditContent ? 'title="Click to edit"' : ''}>${esc(iss.description||(canEditContent?'Click to add a description…':'No description.'))}${canEditContent ? '<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' : ''}</div>
+                <div class="md-body ${canEditContent ? 'inline-edit' : ''}" id="desc-edit" style="font-size:14px;line-height:1.6;color:var(--text-2);min-height:40px" ${canEditContent ? 'title="Click to edit"' : ''}>${iss.description ? renderMarkdown(iss.description) : (canEditContent ? '<span class="text-3">Click to add a description…</span>' : 'No description.')}${canEditContent ? '<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' : ''}</div>
               </section>
 
               <!-- Attachments -->
@@ -134,14 +159,22 @@
 
               <!-- Comments -->
               <section>
-                <h4 style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border-2);padding-bottom:8px;margin-bottom:16px">Activity (${iss.comments?.length||0} comments)</h4>
+                <h4 style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border-2);padding-bottom:8px;margin-bottom:16px">Comments (${iss.comments?.length||0})</h4>
                 <div id="comments-list" style="display:flex;flex-direction:column;gap:16px;margin-bottom:20px">
                   ${(iss.comments||[]).map(c => commentHtml(c, me)).join('')}
                 </div>
                 <div style="display:flex;gap:12px;align-items:flex-start">
                   ${avatarHtml(me, 28)}
                   <div style="flex:1">
-                    <textarea class="form-control" id="comment-input" rows="3" placeholder="Add a comment…"></textarea>
+                    <div class="md-toolbar">
+                      <button type="button" title="Bold" onclick="mdInsert('comment-input','**','**')"><b>B</b></button>
+                      <button type="button" title="Italic" onclick="mdInsert('comment-input','_','_')"><i>i</i></button>
+                      <button type="button" title="Code" onclick="mdInsert('comment-input','\`','\`')">\`</button>
+                      <button type="button" title="Link" onclick="mdInsert('comment-input','[','](url)')">↗</button>
+                      <button type="button" class="md-preview-toggle" id="comment-preview-btn">Preview</button>
+                    </div>
+                    <textarea class="form-control" id="comment-input" rows="3" placeholder="Add a comment… (supports markdown, paste images)"></textarea>
+                    <div id="comment-preview" class="md-body" style="display:none;padding:10px;border:1px solid var(--border-2);border-radius:var(--r-md);min-height:60px;font-size:14px;background:var(--gray-50)"></div>
                     <div style="display:flex;justify-content:flex-end;margin-top:8px">
                       <button class="btn btn-primary btn-sm" id="submit-comment-btn">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -149,6 +182,17 @@
                       </button>
                     </div>
                   </div>
+                </div>
+              </section>
+
+              <!-- Activity log (collapsible) -->
+              <section style="margin-top:32px">
+                <h4 style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border-2);padding-bottom:8px;margin-bottom:0;cursor:pointer;display:flex;align-items:center;gap:6px" id="activity-header" onclick="toggleActivityLog()">
+                  <svg id="activity-chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="transition:transform .2s"><path d="M6 9l6 6 6-6"/></svg>
+                  Activity Log
+                </h4>
+                <div id="activity-body" style="display:none;padding-top:12px">
+                  <div id="activity-list"><span class="text-3" style="font-size:13px">Loading…</span></div>
                 </div>
               </section>
             </div>
@@ -171,7 +215,7 @@
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Type</div>
                   ${canEditMeta
-                    ? `<select class="form-control" id="sf-type">${['bug','task','story','epic'].map(t=>`<option value="${t}"${t===iss.type?' selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>`
+                    ? `<select class="form-control" id="sf-type">${['bug','task','story','epic','incident'].map(t=>`<option value="${t}"${t===iss.type?' selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>`
                     : `<div class="text-2 text-sm">${TYPE_LABELS[iss.type]||iss.type}</div>`}
                 </div>
                 <div class="sidebar-field">
@@ -203,6 +247,24 @@
                   ${canEditContent
                     ? `<input class="form-control" type="text" id="sf-labels" value="${esc((iss.labels||[]).join(', '))}" placeholder="comma separated" />`
                     : `<div class="text-2 text-sm">${(iss.labels||[]).length ? esc((iss.labels||[]).join(', ')) : '—'}</div>`}
+                </div>
+                <!-- Linked Issues -->
+                <div class="sidebar-field">
+                  <div class="sidebar-field-label" style="display:flex;align-items:center;justify-content:space-between">
+                    Linked Issues
+                    <button class="btn btn-ghost btn-sm" id="add-link-toggle" title="Add link" style="font-size:18px;line-height:1;padding:0 4px">+</button>
+                  </div>
+                  <div id="links-list" class="link-section"></div>
+                  <div id="add-link-form" style="display:none" class="link-add-form">
+                    <select class="form-control" id="link-type-sel" style="flex:0 0 auto;font-size:12px;padding:4px 6px">
+                      <option value="blocks">Blocks</option>
+                      <option value="blocked_by">Blocked by</option>
+                      <option value="relates_to" selected>Relates to</option>
+                      <option value="duplicate_of">Duplicate of</option>
+                    </select>
+                    <input class="form-control" id="link-target-input" placeholder="PROJ-123" style="flex:1;font-size:12px;padding:4px 6px;min-width:80px" />
+                    <button class="btn btn-primary btn-sm" id="add-link-btn">Add</button>
+                  </div>
                 </div>
                 <hr class="divider" />
                 <div class="sidebar-field">
@@ -239,7 +301,7 @@
               <span class="comment-time">${fmtRelative(c.created_at)}</span>
               ${canDeleteThisComment ? `<button class="btn btn-ghost btn-sm comment-delete" title="Delete" onclick="deleteComment('${issueId}','${c.id}',this)"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>` : ''}
             </div>
-            <div class="comment-text">${esc(c.body)}</div>
+            <div class="comment-text md-body">${renderMarkdown(c.body)}</div>
           </div>
         </div>`
     }
@@ -292,10 +354,10 @@
           await PATCH('/issues/' + issueId, { title: val })
         })
 
-        // Inline edit — description
+        // Inline edit — description (renders as markdown)
         makeInlineEdit('desc-edit', iss.description || '', true, async val => {
           await PATCH('/issues/' + issueId, { description: val })
-        })
+        }, renderMarkdown)
       }
 
       // Delete issue — leads/admins only
@@ -375,15 +437,164 @@
           const c = await POST(`/issues/${issueId}/comments`, { body })
           document.getElementById('comments-list').insertAdjacentHTML('beforeend', commentHtml(c, me))
           document.getElementById('comment-input').value = ''
+          // Hide preview if visible
+          document.getElementById('comment-preview').style.display = 'none'
+          document.getElementById('comment-input').style.display = ''
+          document.getElementById('comment-preview-btn').textContent = 'Preview'
         } catch (err) { toast(err.message, 'error') }
       })
+
+      // Markdown preview toggle
+      document.getElementById('comment-preview-btn')?.addEventListener('click', () => {
+        const ta  = document.getElementById('comment-input')
+        const pre = document.getElementById('comment-preview')
+        const btn = document.getElementById('comment-preview-btn')
+        const showing = pre.style.display !== 'none'
+        if (showing) {
+          pre.style.display = 'none'
+          ta.style.display = ''
+          btn.textContent = 'Preview'
+        } else {
+          pre.innerHTML = renderMarkdown(ta.value || '_Nothing to preview._')
+          pre.style.display = ''
+          ta.style.display = 'none'
+          btn.textContent = 'Edit'
+        }
+      })
+
+      // Image paste into comment textarea
+      document.getElementById('comment-input')?.addEventListener('paste', async e => {
+        const imgItem = [...(e.clipboardData?.items||[])].find(item => item.type.startsWith('image/'))
+        if (!imgItem) return
+        e.preventDefault()
+        const ta = e.target
+        const placeholder = '![Uploading image…]()'
+        const start = ta.selectionStart
+        ta.value = ta.value.slice(0, start) + placeholder + ta.value.slice(ta.selectionEnd)
+        try {
+          const file = imgItem.getAsFile()
+          const data = await new Promise((res, rej) => {
+            const r = new FileReader()
+            r.onload = ev => res(ev.target.result)
+            r.onerror = () => rej(new Error('Read failed'))
+            r.readAsDataURL(file)
+          })
+          const att = await POST(`/issues/${issueId}/attachments`, {
+            filename: `paste-${Date.now()}.png`,
+            mime_type: file.type || 'image/png',
+            data,
+          })
+          const url = `/api/issues/${issueId}/attachments/${att.id}/data`
+          ta.value = ta.value.replace(placeholder, `![image](${url})`)
+        } catch (err) {
+          ta.value = ta.value.replace(placeholder, '')
+          toast('Image upload failed: ' + err.message, 'error')
+        }
+      })
+
+      // Activity log
+      async function loadActivityLog() {
+        const ACTION_LABELS = {
+          'issue.create':   'created this issue',
+          'issue.update':   'updated this issue',
+          'issue.delete':   'deleted this issue',
+          'comment.create': 'added a comment',
+          'comment.delete': 'deleted a comment',
+        }
+        try {
+          const entries = await GET(`/issues/${issueId}/activity`)
+          const list = document.getElementById('activity-list')
+          if (!list) return
+          if (!entries.length) { list.innerHTML = '<span class="text-3" style="font-size:13px">No activity yet.</span>'; return }
+          list.innerHTML = entries.map(entry => {
+            const actor = { name: entry.actor_name, initials: entry.actor_initials, color: entry.actor_color, avatar: entry.actor_avatar }
+            const label = ACTION_LABELS[entry.action] || entry.action
+            const meta  = entry.meta
+            let detail  = ''
+            if (meta?.changed?.includes('status')) detail = ` → status change`
+            else if (meta?.changed?.includes('assignee_id')) detail = ` → assignee change`
+            else if (meta?.changed) detail = ` → ${meta.changed.join(', ')}`
+            return `
+              <div class="activity-entry">
+                ${avatarHtml(actor, 22)}
+                <div class="activity-line">
+                  <strong>${esc(entry.actor_name||'Someone')}</strong> ${label}${detail}
+                </div>
+                <span class="activity-time">${fmtRelative(entry.created_at)}</span>
+              </div>`
+          }).join('')
+        } catch { document.getElementById('activity-list').innerHTML = '<span class="text-3" style="font-size:13px">Could not load activity.</span>' }
+      }
+
+      // Linked issues
+      async function loadLinks() {
+        const LINK_LABELS = { blocks: 'Blocks', blocked_by: 'Blocked by', relates_to: 'Relates to', duplicate_of: 'Duplicate of' }
+        try {
+          const links = await GET(`/issues/${issueId}/links`)
+          const list  = document.getElementById('links-list')
+          if (!list) return
+          if (!links.length) { list.innerHTML = '<span class="text-3" style="font-size:12px">No linked issues.</span>'; return }
+          list.innerHTML = links.map(l => `
+            <div class="link-item" data-lid="${esc(l.id)}">
+              <span class="link-type-badge">${LINK_LABELS[l.type]||l.type}</span>
+              <a href="/issue.html?id=${esc(l.target_id)}" class="mono" style="font-size:12px;color:var(--brand)">${esc(l.target_key)}</a>
+              <span style="font-size:12px;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.target_title)}</span>
+              <button class="btn btn-ghost btn-sm" title="Remove link" onclick="removeLink('${esc(l.id)}')" style="padding:2px 6px;font-size:11px">×</button>
+            </div>`).join('')
+        } catch { document.getElementById('links-list').innerHTML = '<span class="text-3" style="font-size:12px">Could not load links.</span>' }
+      }
+      await loadLinks()
+
+      document.getElementById('add-link-toggle')?.addEventListener('click', () => {
+        const form = document.getElementById('add-link-form')
+        form.style.display = form.style.display === 'none' ? '' : 'none'
+      })
+      document.getElementById('add-link-btn')?.addEventListener('click', async () => {
+        const targetKey = document.getElementById('link-target-input').value.trim()
+        const type      = document.getElementById('link-type-sel').value
+        if (!targetKey) return
+        try {
+          await POST(`/issues/${issueId}/links`, { targetKey, type })
+          document.getElementById('link-target-input').value = ''
+          document.getElementById('add-link-form').style.display = 'none'
+          await loadLinks()
+          toast('Link added', 'success')
+        } catch (err) { toast(err.message, 'error') }
+      })
+
+      // SSE — subscribe to issue-scoped events
+      if (typeof EventSource !== 'undefined') {
+        const es = new EventSource(`/api/events?issueId=${encodeURIComponent(issueId)}`)
+        es.addEventListener('issue.update', () => {
+          const nudge = document.getElementById('issue-update-nudge')
+          if (!nudge) {
+            const n = document.createElement('div')
+            n.id = 'issue-update-nudge'
+            n.style.cssText = 'position:sticky;top:64px;z-index:50;background:var(--brand);color:#fff;text-align:center;padding:8px;font-size:13px;cursor:pointer;border-radius:var(--r-md);margin-bottom:8px'
+            n.textContent = 'Issue was updated — click to reload'
+            n.onclick = () => location.reload()
+            document.getElementById('page-content')?.prepend(n)
+          }
+        })
+        es.addEventListener('comment.create', async () => {
+          // Silently refresh comments list
+          try {
+            const fresh = await GET('/issues/' + issueId)
+            const list = document.getElementById('comments-list')
+            if (list) list.innerHTML = (fresh.comments||[]).map(c => commentHtml(c, me)).join('')
+          } catch {}
+        })
+        window.addEventListener('beforeunload', () => es.close())
+      }
     }
 
-    function makeInlineEdit(elemId, initialVal, multiline, onSave) {
+    function makeInlineEdit(elemId, initialVal, multiline, onSave, renderFn) {
+      const render = renderFn || esc
       const el = document.getElementById(elemId)
       if (!el) return
+      const pencil = `<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
       el.addEventListener('click', () => {
-        const current = el.dataset.value || initialVal
+        const current = el.dataset.value !== undefined ? el.dataset.value : initialVal
         el.classList.add('inline-edit-active')
         el.innerHTML = multiline
           ? `<textarea class="form-control" id="${elemId}-ta" style="min-height:100px">${esc(current)}</textarea><div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" id="${elemId}-save">Save</button><button class="btn btn-secondary btn-sm" id="${elemId}-cancel">Cancel</button></div>`
@@ -394,7 +605,8 @@
 
         document.getElementById(elemId + '-cancel').addEventListener('click', () => {
           el.classList.remove('inline-edit-active')
-          el.innerHTML = (el.dataset.value || initialVal) + `<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
+          const displayed = el.dataset.value !== undefined ? el.dataset.value : initialVal
+          el.innerHTML = (displayed ? render(displayed) : '<span class="text-3">Click to add a description…</span>') + pencil
         })
         document.getElementById(elemId + '-save').addEventListener('click', async () => {
           const field = multiline ? el.querySelector('textarea') : el.querySelector('input')
@@ -410,7 +622,7 @@
             await onSave(val)
             el.dataset.value = val
             el.classList.remove('inline-edit-active')
-            el.innerHTML = esc(val) + `<svg class="inline-edit-pencil" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
+            el.innerHTML = render(val) + pencil
             toast('Saved', 'success')
           } catch (err) { toast(err.message, 'error') }
         })
@@ -448,6 +660,86 @@
       openModal('create-project-modal')
     })
   })()
+
+  function renderMarkdown(text) {
+    if (!text) return ''
+    try {
+      return DOMPurify.sanitize(marked.parse(text), { USE_PROFILES: { html: true } })
+    } catch { return esc(text) }
+  }
+
+  function mdInsert(textareaId, before, after) {
+    const ta = document.getElementById(textareaId)
+    if (!ta) return
+    const start = ta.selectionStart, end = ta.selectionEnd
+    const sel = ta.value.slice(start, end)
+    ta.value = ta.value.slice(0, start) + before + sel + after + ta.value.slice(end)
+    ta.selectionStart = start + before.length
+    ta.selectionEnd   = start + before.length + sel.length
+    ta.focus()
+  }
+
+  function toggleActivityLog() {
+    const body   = document.getElementById('activity-body')
+    const chev   = document.getElementById('activity-chevron')
+    const isOpen = body.style.display !== 'none'
+    if (isOpen) {
+      body.style.display = 'none'
+      chev.style.transform = 'rotate(-90deg)'
+    } else {
+      body.style.display = ''
+      chev.style.transform = ''
+      // Load on first open
+      if (body.dataset.loaded !== '1') {
+        body.dataset.loaded = '1'
+        const issueId = new URLSearchParams(location.search).get('id')
+        if (!issueId) return
+        GET('/issues/' + issueId + '/activity').then(entries => {
+          const ACTION_LABELS = {
+            'issue.create':   'created this issue',
+            'issue.update':   'updated this issue',
+            'issue.delete':   'deleted this issue',
+            'comment.create': 'added a comment',
+            'comment.delete': 'deleted a comment',
+          }
+          const list = document.getElementById('activity-list')
+          if (!list) return
+          if (!entries.length) { list.innerHTML = '<span class="text-3" style="font-size:13px">No activity yet.</span>'; return }
+          list.innerHTML = entries.map(entry => {
+            const actor = { name: entry.actor_name, initials: entry.actor_initials, color: entry.actor_color, avatar: entry.actor_avatar }
+            const label = ACTION_LABELS[entry.action] || entry.action
+            const meta  = entry.meta
+            let detail  = ''
+            if (meta?.changed?.includes('status')) detail = ` → status change`
+            else if (meta?.changed?.includes('assignee_id')) detail = ` → assignee change`
+            else if (meta?.changed) detail = ` → ${meta.changed.join(', ')}`
+            return `
+              <div class="activity-entry">
+                ${avatarHtml(actor, 22)}
+                <div class="activity-line">
+                  <strong>${esc(entry.actor_name||'Someone')}</strong> ${label}${detail}
+                </div>
+                <span class="activity-time">${fmtRelative(entry.created_at)}</span>
+              </div>`
+          }).join('')
+        }).catch(() => {
+          document.getElementById('activity-list').innerHTML = '<span class="text-3" style="font-size:13px">Could not load activity.</span>'
+        })
+      }
+    }
+  }
+
+  async function removeLink(linkId) {
+    const issueId = new URLSearchParams(location.search).get('id')
+    if (!issueId) return
+    try {
+      await fetch(`/api/issues/${issueId}/links/${linkId}`, { method:'DELETE', credentials:'same-origin' })
+      document.querySelector(`[data-lid="${linkId}"]`)?.remove()
+      const list = document.getElementById('links-list')
+      if (list && !list.children.length) list.innerHTML = '<span class="text-3" style="font-size:12px">No linked issues.</span>'
+      toast('Link removed', 'success')
+    } catch (err) { toast(err.message || 'Failed to remove link', 'error') }
+  }
 
   async function deleteAttachment(attachId) {
     const issueId = new URLSearchParams(location.search).get('id')
