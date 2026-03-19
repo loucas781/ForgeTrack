@@ -890,13 +890,13 @@ html.theme-transitioning *::after {
 }
 .ir-actions-btn {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-  opacity: 0; transition: opacity var(--t-fast);
+  opacity: 0; pointer-events: none; transition: opacity var(--t-fast);
   background: var(--gray-50); border: 1px solid var(--border-2);
   border-radius: var(--r-md); cursor: pointer; color: var(--text-2);
   font-size: 16px; letter-spacing: 2px; line-height: 1; padding: 2px 8px;
   z-index: 2;
 }
-.issue-row-wrap:hover .ir-actions-btn { opacity: 1; }
+.issue-row-wrap:hover .ir-actions-btn { opacity: 1; pointer-events: auto; }
 .ir-actions-menu {
   position: absolute; z-index: 500;
   background: var(--surface); border: 1px solid var(--border-2);
