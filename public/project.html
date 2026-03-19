@@ -201,7 +201,7 @@
       document.getElementById('filter-bar').style.display = showFilters ? 'flex' : 'none'
     })
     document.getElementById('clear-filters-btn').addEventListener('click', () => {
-      filters.status = []; filters.type = bugsOnly ? ['bug'] : []; filters.priority = []; filters.assignee = ''; filters.q = ''
+      filters.status = []; filters.type = bugsOnly ? ['bug'] : incidentsOnly ? ['incident'] : []; filters.priority = []; filters.assignee = ''; filters.q = ''
       document.getElementById('filter-q').value = ''
       document.getElementById('filter-assignee').value = ''
       document.querySelectorAll('.filter-chip.on').forEach(c => c.classList.remove('on'))

@@ -169,7 +169,7 @@
                     <div class="md-toolbar">
                       <button type="button" title="Bold" onclick="mdInsert('comment-input','**','**')"><b>B</b></button>
                       <button type="button" title="Italic" onclick="mdInsert('comment-input','_','_')"><i>i</i></button>
-                      <button type="button" title="Code" onclick="mdInsert('comment-input','\`','\`')">{'`'}</button>
+                      <button type="button" title="Code" onclick="mdInsert('comment-input','\`','\`')">\`</button>
                       <button type="button" title="Link" onclick="mdInsert('comment-input','[','](url)')">↗</button>
                       <button type="button" class="md-preview-toggle" id="comment-preview-btn">Preview</button>
                     </div>
@@ -215,7 +215,7 @@
                 <div class="sidebar-field">
                   <div class="sidebar-field-label">Type</div>
                   ${canEditMeta
-                    ? `<select class="form-control" id="sf-type">${['bug','task','story','epic'].map(t=>`<option value="${t}"${t===iss.type?' selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>`
+                    ? `<select class="form-control" id="sf-type">${['bug','task','story','epic','incident'].map(t=>`<option value="${t}"${t===iss.type?' selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>`
                     : `<div class="text-2 text-sm">${TYPE_LABELS[iss.type]||iss.type}</div>`}
                 </div>
                 <div class="sidebar-field">
