@@ -22,18 +22,20 @@ msg_ok "Deploying environment: ${APP_ENV}"
 
 # ── Container root password ────────────────────────────────────────────────────
 while true; do
-  echo -n "  Set container root password: "
+  echo -n "  Set container root password (leave blank to skip): "
   read -rs ROOT_PASS; echo
-  if [[ -z "$ROOT_PASS" ]]; then
-    echo -e "  ${RD}Password cannot be empty.${CL}"; continue
-  fi
+  if [[ -z "$ROOT_PASS" ]]; then break; fi
   echo -n "  Confirm password: "
   read -rs ROOT_PASS_CONFIRM; echo
   if [[ "$ROOT_PASS" == "$ROOT_PASS_CONFIRM" ]]; then break; fi
   echo -e "  ${RD}Passwords do not match, try again.${CL}"
 done
-echo "root:${ROOT_PASS}" | chpasswd
-msg_ok "Root password set"
+if [[ -n "$ROOT_PASS" ]]; then
+  echo "root:${ROOT_PASS}" | chpasswd
+  msg_ok "Root password set"
+else
+  msg_ok "Root password unchanged"
+fi
 
 # ── 1. OS update ──────────────────────────────────────────────────────────────
 msg_info "Updating OS packages"
@@ -184,5 +186,5 @@ msg_ok "ForgeTrack installation complete — running at http://localhost:3000"
 echo ""
 echo -e "  ${GN}Container credentials${CL}"
 echo -e "    Username : root"
-echo -e "    Password : ${ROOT_PASS}"
+echo -e "    Password : ${ROOT_PASS:-"(not set)"}"
 echo ""
