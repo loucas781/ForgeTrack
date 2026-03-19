@@ -20,6 +20,21 @@ COOKIE_SECURE="false"
 # It must stay false while running over plain HTTP or logins will silently fail
 msg_ok "Deploying environment: ${APP_ENV}"
 
+# ── Container root password ────────────────────────────────────────────────────
+while true; do
+  echo -n "  Set container root password: "
+  read -rs ROOT_PASS; echo
+  if [[ -z "$ROOT_PASS" ]]; then
+    echo -e "  ${RD}Password cannot be empty.${CL}"; continue
+  fi
+  echo -n "  Confirm password: "
+  read -rs ROOT_PASS_CONFIRM; echo
+  if [[ "$ROOT_PASS" == "$ROOT_PASS_CONFIRM" ]]; then break; fi
+  echo -e "  ${RD}Passwords do not match, try again.${CL}"
+done
+echo "root:${ROOT_PASS}" | chpasswd
+msg_ok "Root password set"
+
 # ── 1. OS update ──────────────────────────────────────────────────────────────
 msg_info "Updating OS packages"
 apt-get update -qq && apt-get upgrade -y -qq 2>&1 | tail -3
@@ -166,3 +181,8 @@ chmod +x /opt/forgetrack/update.sh
 
 echo ""
 msg_ok "ForgeTrack installation complete — running at http://localhost:3000"
+echo ""
+echo -e "  ${GN}Container credentials${CL}"
+echo -e "    Username : root"
+echo -e "    Password : ${ROOT_PASS}"
+echo ""
