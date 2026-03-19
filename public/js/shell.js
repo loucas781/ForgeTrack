@@ -563,9 +563,14 @@ function globalModalsHTML() {
     })
   }
 
+  const THEME_LABELS = { system: 'System', light: 'Light', dark: 'Dark', oled: 'OLED' }
+
   function saveAndApply(choice, animate) {
     try { localStorage.setItem(STORAGE_KEY, choice) } catch {}
     applyTheme(choice, animate)
+    if (animate && typeof toast === 'function') {
+      toast('Theme: ' + (THEME_LABELS[choice] || choice), 'success')
+    }
   }
 
   // Apply immediately on load (no animation)

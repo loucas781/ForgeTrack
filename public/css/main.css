@@ -879,3 +879,71 @@ html.theme-transitioning *::after {
   width: 16px; height: 16px; border-radius: 50%;
   border: 2px solid var(--border); flex-shrink: 0;
 }
+
+/* ── Issue row quick actions ────────────────────────────────────── */
+.issue-row-wrap {
+  position: relative;
+  display: flex; align-items: center;
+}
+.issue-row-wrap .issue-row {
+  flex: 1;
+}
+.ir-actions-btn {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  opacity: 0; transition: opacity var(--t-fast);
+  background: var(--gray-50); border: 1px solid var(--border-2);
+  border-radius: var(--r-md); cursor: pointer; color: var(--text-2);
+  font-size: 16px; letter-spacing: 2px; line-height: 1; padding: 2px 8px;
+  z-index: 2;
+}
+.issue-row-wrap:hover .ir-actions-btn { opacity: 1; }
+.ir-actions-menu {
+  position: absolute; z-index: 500;
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-xl);
+  padding: 4px; min-width: 160px;
+}
+.ir-menu-item {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 12px; background: none; border: none;
+  font-family: var(--font); font-size: 13px; color: var(--text);
+  cursor: pointer; border-radius: var(--r-md);
+  transition: background var(--t-fast);
+}
+.ir-menu-item:hover { background: var(--gray-100); }
+
+/* ── Keyboard shortcut overlay ──────────────────────────────────── */
+#shortcut-help-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.45); display: flex;
+  align-items: center; justify-content: center;
+}
+.shortcut-help-modal {
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: var(--r-xl); box-shadow: var(--shadow-xl);
+  min-width: 320px; max-width: 420px; width: 100%;
+  overflow: hidden;
+}
+.shortcut-help-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; font-weight: 600; font-size: 14px;
+  border-bottom: 1px solid var(--border-2);
+}
+.shortcut-help-header button {
+  background: none; border: none; cursor: pointer; color: var(--text-3);
+  font-size: 16px; line-height: 1; padding: 0;
+}
+.shortcut-help-body { padding: 12px 18px; }
+.shortcut-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 7px 0; border-bottom: 1px solid var(--border-2); font-size: 13px;
+}
+.shortcut-row:last-child { border-bottom: none; }
+.shortcut-row span { color: var(--text-2); }
+kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; padding: 2px 6px;
+  background: var(--gray-100); border: 1px solid var(--border);
+  border-radius: 4px; font-family: var(--mono); font-size: 11px;
+  font-weight: 600; color: var(--text); box-shadow: 0 1px 0 var(--border);
+}
