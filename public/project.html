@@ -112,11 +112,12 @@
 
   // ── Issue list view ─────────────────────────────────────────────────────────
   async function renderIssueList(project, content, view) {
-    const bugsOnly = view === 'bugs'
-    const title    = view === 'backlog' ? 'Backlog' : bugsOnly ? 'Bug Reports' : 'Issues'
+    const bugsOnly      = view === 'bugs'
+    const incidentsOnly = view === 'incidents'
+    const title         = view === 'backlog' ? 'Backlog' : bugsOnly ? 'Bug Reports' : incidentsOnly ? 'Incidents' : 'Issues'
 
     // Build filter state
-    const filters = { status: [], type: bugsOnly ? ['bug'] : [], priority: [], assignee: '', q: '' }
+    const filters = { status: [], type: bugsOnly ? ['bug'] : incidentsOnly ? ['incident'] : [], priority: [], assignee: '', q: '' }
     let showFilters = false
     let users = []
 
@@ -158,7 +159,7 @@
                 </button>`
               : `<button class="btn btn-primary" id="create-issue-page-btn">
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                  ${bugsOnly ? 'Report Bug' : 'Create Issue'}
+                  ${bugsOnly ? 'Report Bug' : incidentsOnly ? 'Report Incident' : 'Create Issue'}
                 </button>`
             }
           </div>
@@ -171,9 +172,9 @@
             <span class="filter-label">Status</span>
             ${['todo','inprogress','review','done','cancelled'].map(s => `<button class="filter-chip" data-filter="status" data-val="${s}">${STATUS_LABELS[s]}</button>`).join('')}
           </div>
-          ${!bugsOnly ? `<div class="filter-group">
+          ${!bugsOnly && !incidentsOnly ? `<div class="filter-group">
             <span class="filter-label">Type</span>
-            ${['bug','task','story','epic'].map(t => `<button class="filter-chip" data-filter="type" data-val="${t}">${TYPE_LABELS[t]}</button>`).join('')}
+            ${['bug','task','story','epic','incident'].map(t => `<button class="filter-chip" data-filter="type" data-val="${t}">${TYPE_LABELS[t]}</button>`).join('')}
           </div>` : ''}
           <div class="filter-group">
             <span class="filter-label">Priority</span>
@@ -259,6 +260,7 @@
       populateSelect(document.getElementById('ci-project'), [project], 'id', 'name')
       document.getElementById('ci-project').value = project.id
       if (bugsOnly) document.getElementById('ci-type').value = 'bug'
+      if (incidentsOnly) document.getElementById('ci-type').value = 'incident'
       const asgn = document.getElementById('ci-assignee')
       populateSelect(asgn, users.filter(u => u.role === 'admin' || u.role === 'engineer'), 'id', 'name', 'Unassigned')
       await applyCreateIssuePrefs()

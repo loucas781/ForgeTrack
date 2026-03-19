@@ -60,10 +60,11 @@
   --p-trivial:  #97a0af;
 
   /* types */
-  --t-bug:   #e01e5a;
-  --t-task:  #0052cc;
-  --t-story: #00875a;
-  --t-epic:  #904ee2;
+  --t-bug:      #e01e5a;
+  --t-task:     #0052cc;
+  --t-story:    #00875a;
+  --t-epic:     #904ee2;
+  --t-incident: #d04000;
 }
 
 html, body { height: 100%; font-family: var(--font); font-size: 14px; line-height: 1.5; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
@@ -254,10 +255,11 @@ select.form-control {
   width: 16px; height: 16px; border-radius: 2px;
   font-size: 10px; font-weight: 700; flex-shrink: 0;
 }
-.ti-bug   { background: var(--t-bug);   color: #fff; }
-.ti-task  { background: var(--t-task);  color: #fff; }
-.ti-story { background: var(--t-story); color: #fff; }
-.ti-epic  { background: var(--t-epic);  color: #fff; }
+.ti-bug      { background: var(--t-bug);      color: #fff; }
+.ti-task     { background: var(--t-task);     color: #fff; }
+.ti-story    { background: var(--t-story);    color: #fff; }
+.ti-epic     { background: var(--t-epic);     color: #fff; }
+.ti-incident { background: var(--t-incident); color: #fff; }
 
 .label-chip { padding: 1px 6px; background: var(--gray-100); border-radius: 2px; font-size: 11px; color: var(--text-2); }
 

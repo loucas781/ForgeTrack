@@ -241,6 +241,10 @@ async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_issue_links_source ON issue_links(source_id);
       CREATE INDEX IF NOT EXISTS idx_issue_links_target ON issue_links(target_id);
 
+      -- ── Add incident type to issues ────────────────────────────────────────
+      ALTER TABLE issues DROP CONSTRAINT IF EXISTS issues_type_check;
+      ALTER TABLE issues ADD CONSTRAINT issues_type_check CHECK (type IN ('bug','task','story','epic','incident'));
+
     `)
     console.log('✓ PostgreSQL schema ready')
   } finally {

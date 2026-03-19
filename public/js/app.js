@@ -4,7 +4,7 @@
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_LABELS   = { todo:'To Do', inprogress:'In Progress', review:'In Review', done:'Done', cancelled:'Cancelled' }
 const PRIORITY_LABELS = { critical:'Critical', high:'High', medium:'Medium', low:'Low', trivial:'Trivial' }
-const TYPE_LABELS     = { bug:'Bug', task:'Task', story:'Story', epic:'Epic' }
+const TYPE_LABELS     = { bug:'Bug', task:'Task', story:'Story', epic:'Epic', incident:'Incident' }
 const PROJECT_COLORS  = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff']
 const AVATAR_COLORS   = ['#0052cc','#00875a','#6554c0','#ff5630','#ff991f','#36b37e','#00b8d9','#e01e5a','#904ee2','#0065ff','#172b4d','#42526e']
 
