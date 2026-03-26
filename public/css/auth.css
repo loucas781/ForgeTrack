@@ -24,6 +24,15 @@ body.auth-page { display: flex; align-items: center; justify-content: center; mi
 .auth-submit { width: 100%; justify-content: center; margin-top: 16px; }
 .auth-switch { text-align: center; font-size: 13px; color: var(--text-2); margin-top: 16px; }
 .auth-switch a { font-weight: 500; }
+.remember-label { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.remember-toggle-wrap { position: relative; flex-shrink: 0; }
+.remember-toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.remember-toggle-track { width: 34px; height: 20px; background: var(--border); border-radius: 10px; transition: background var(--t-base); position: relative; }
+.remember-toggle-input:checked + .remember-toggle-track { background: var(--brand); }
+.remember-toggle-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform var(--t-base); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.remember-toggle-input:checked ~ .remember-toggle-track .remember-toggle-thumb,
+.remember-toggle-input:checked + .remember-toggle-track .remember-toggle-thumb { transform: translateX(14px); }
+.remember-warning { display: flex; align-items: flex-start; gap: 7px; padding: 9px 12px; background: rgba(255,163,72,.10); border: 1px solid rgba(255,163,72,.35); border-radius: var(--r-md); color: var(--orange); font-size: 12px; line-height: 1.5; margin-bottom: 4px; }
 
 
 /* ── Auth page dark mode — explicit data-theme ───────────────── */
