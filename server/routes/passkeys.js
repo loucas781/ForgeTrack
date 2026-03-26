@@ -46,7 +46,10 @@ setInterval(() => {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function getOrigin(req) {
-  const proto = req.get('x-forwarded-proto') || (process.env.COOKIE_SECURE === 'true' ? 'https' : 'http')
+  // req.protocol respects Express's trust proxy setting (TRUST_PROXY=true reads x-forwarded-proto).
+  // Fall back to COOKIE_SECURE so staging environments with a reverse proxy but no TRUST_PROXY set
+  // still resolve the correct origin.
+  const proto = req.protocol === 'https' || process.env.COOKIE_SECURE === 'true' ? 'https' : 'http'
   return `${proto}://${req.get('host')}`
 }
 

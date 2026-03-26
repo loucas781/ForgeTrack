@@ -32,45 +32,60 @@
     </div>
 
     <form class="auth-form" id="login-form" novalidate>
-      <h2 class="auth-heading">Welcome back</h2>
-      <p class="auth-subheading">Sign in to continue to ForgeTrack</p>
-
       <div id="form-error" class="auth-error hidden"></div>
 
-      <div class="form-group">
-        <label class="form-label" for="email">Email address</label>
-        <input class="form-control" type="text" id="email" name="email" autocomplete="email" placeholder="you@example.com" inputmode="email" autofocus />
-      </div>
+      <div id="login-fields">
+        <h2 class="auth-heading">Welcome back</h2>
+        <p class="auth-subheading">Sign in to continue to ForgeTrack</p>
 
-      <div class="form-group" style="margin-bottom:8px">
-        <label class="form-label" for="password">Password</label>
-        <div class="pw-wrap">
-          <input class="form-control" type="password" id="password" name="password" autocomplete="current-password" placeholder="Your password" />
-          <button type="button" class="pw-toggle" id="pw-toggle" title="Show/hide password">
-            <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
+        <div class="form-group">
+          <label class="form-label" for="email">Email address</label>
+          <input class="form-control" type="text" id="email" name="email" autocomplete="email" placeholder="you@example.com" inputmode="email" autofocus />
         </div>
+
+        <div class="form-group" style="margin-bottom:8px">
+          <label class="form-label" for="password">Password</label>
+          <div class="pw-wrap">
+            <input class="form-control" type="password" id="password" name="password" autocomplete="current-password" placeholder="Your password" />
+            <button type="button" class="pw-toggle" id="pw-toggle" title="Show/hide password">
+              <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <a href="/forgot-password.html" style="font-size:12px;color:var(--brand);text-decoration:none">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg auth-submit" id="submit-btn">
+          Sign In
+        </button>
+
+        <div id="passkey-divider" style="display:none;position:relative;margin:16px 0;text-align:center">
+          <hr style="border:none;border-top:1px solid var(--border-2);position:absolute;top:50%;width:100%;left:0" />
+          <span style="position:relative;background:var(--surface);padding:0 10px;font-size:12px;color:var(--text-3)">or</span>
+        </div>
+
+        <button type="button" class="btn btn-secondary btn-lg auth-submit" id="passkey-btn" style="display:none">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right:8px"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          Sign in with a passkey
+        </button>
+
+        <p class="auth-switch" style="display:none">Don't have an account? <a href="/signup.html">Create one</a></p>
       </div>
 
-      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-        <a href="/forgot-password.html" style="font-size:12px;color:var(--brand);text-decoration:none">Forgot password?</a>
+      <div id="twofa-step" style="display:none">
+        <h2 class="auth-heading">Two-factor authentication</h2>
+        <p class="auth-subheading">Enter the 6-digit code from your authenticator app</p>
+
+        <div class="form-group">
+          <label class="form-label" for="totp-code">Authenticator code</label>
+          <input class="form-control" type="text" id="totp-code" inputmode="numeric" autocomplete="one-time-code" placeholder="000 000" maxlength="7" />
+        </div>
+
+        <button type="button" class="btn btn-primary btn-lg auth-submit" id="twofa-btn">Verify</button>
+        <button type="button" class="btn btn-secondary btn-lg auth-submit" id="twofa-back-btn" style="margin-top:8px">Back to sign in</button>
       </div>
-
-      <button type="submit" class="btn btn-primary btn-lg auth-submit" id="submit-btn">
-        Sign In
-      </button>
-
-      <div id="passkey-divider" style="display:none;position:relative;margin:16px 0;text-align:center">
-        <hr style="border:none;border-top:1px solid var(--border-2);position:absolute;top:50%;width:100%;left:0" />
-        <span style="position:relative;background:var(--surface);padding:0 10px;font-size:12px;color:var(--text-3)">or</span>
-      </div>
-
-      <button type="button" class="btn btn-secondary btn-lg auth-submit" id="passkey-btn" style="display:none">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right:8px"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-        Sign in with a passkey
-      </button>
-
-      <p class="auth-switch" style="display:none">Don't have an account? <a href="/signup.html">Create one</a></p>
     </form>
 
     <p id="version-footer" class="auth-version-footer">ForgeTrack</p>
@@ -179,6 +194,46 @@
       }
     })
 
+    let _pendingToken = null
+
+    function showTwofaStep() {
+      document.getElementById('login-fields').style.display = 'none'
+      document.getElementById('twofa-step').style.display = ''
+      document.getElementById('totp-code').focus()
+    }
+
+    function showLoginStep() {
+      _pendingToken = null
+      document.getElementById('twofa-step').style.display = 'none'
+      document.getElementById('login-fields').style.display = ''
+      hideError()
+    }
+
+    document.getElementById('twofa-back-btn').addEventListener('click', showLoginStep)
+
+    document.getElementById('twofa-btn').addEventListener('click', async () => {
+      const btn  = document.getElementById('twofa-btn')
+      const code = document.getElementById('totp-code').value.trim()
+      if (!code) { showError('Please enter your authenticator code.'); return }
+      hideError()
+      btn.disabled = true
+      btn.textContent = 'Verifying…'
+      try {
+        const res  = await fetch('/api/auth/2fa/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ pendingToken: _pendingToken, code }) })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Verification failed')
+        window.location.href = '/'
+      } catch (err) {
+        showError(err.message)
+        btn.disabled = false
+        btn.textContent = 'Verify'
+      }
+    })
+
+    document.getElementById('totp-code').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('twofa-btn').click()
+    })
+
     form.addEventListener('submit', async e => {
       e.preventDefault()
       hideError()
@@ -192,6 +247,13 @@
         const res  = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify({ email, password }) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Login failed')
+        if (data.requires2fa) {
+          _pendingToken = data.pendingToken
+          showTwofaStep()
+          submitBtn.disabled = false
+          submitBtn.textContent = 'Sign In'
+          return
+        }
         window.location.href = '/'
       } catch (err) {
         showError(err.message)
