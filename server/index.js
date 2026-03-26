@@ -159,7 +159,7 @@ app.patch('/api/config', requireAuth, (req, res) => {
   }
   if (typeof req.body.trustProxy === 'boolean') {
     overrides.TRUST_PROXY = req.body.trustProxy ? 'true' : 'false'
-    restartRequired = true  // trust proxy requires server restart to take effect
+    app.set('trust proxy', req.body.trustProxy ? 1 : 0)
   }
   saveOverrides(overrides)
   res.json({

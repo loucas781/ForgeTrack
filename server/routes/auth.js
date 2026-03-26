@@ -118,6 +118,16 @@ router.post('/login', async (req, res) => {
       await db.query('UPDATE users SET password = $1 WHERE id = $2', [newHash, user.id])
     }
 
+    // If 2FA is enabled, issue a short-lived pending token instead of a full session
+    if (user.totp_enabled) {
+      const pendingToken = jwt.sign(
+        { sub: user.id, pending2fa: true },
+        process.env.JWT_SECRET,
+        { expiresIn: '5m' }
+      )
+      return res.json({ requires2fa: true, pendingToken })
+    }
+
     const { password: _, ...pub } = user
     res.cookie('token', makeToken(pub), cookieOpts())
     audit(pub.id, 'user.login', 'user', pub.id, pub.name)
@@ -262,6 +272,39 @@ router.post('/2fa/disable', requireAuth, async (req, res) => {
     res.json({ ok: true })
   } catch (err) {
     console.error('2fa disable:', err.message)
+    res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// ── POST /api/auth/2fa/login — complete login after 2FA challenge ─────────────
+router.post('/2fa/login', async (req, res) => {
+  const { pendingToken, code } = req.body
+  if (!pendingToken || !code) return res.status(400).json({ error: 'Token and code required' })
+
+  let payload
+  try {
+    payload = jwt.verify(pendingToken, process.env.JWT_SECRET)
+  } catch {
+    return res.status(401).json({ error: 'Session expired — please sign in again' })
+  }
+  if (!payload.pending2fa) return res.status(401).json({ error: 'Invalid token' })
+
+  try {
+    const { rows: [user] } = await db.query('SELECT * FROM users WHERE id = $1', [payload.sub])
+    if (!user || !user.totp_enabled || !user.totp_secret)
+      return res.status(401).json({ error: 'User not found or 2FA not configured' })
+    if (user.is_active === false)
+      return res.status(403).json({ error: 'This account has been deactivated. Contact an admin.' })
+
+    const valid = authenticator.verify({ token: String(code).replace(/\s/g, ''), secret: user.totp_secret })
+    if (!valid) return res.status(400).json({ error: 'Invalid code — try again' })
+
+    const { password: _, ...pub } = user
+    res.cookie('token', makeToken(pub), cookieOpts())
+    audit(pub.id, 'user.login', 'user', pub.id, pub.name)
+    res.json({ ok: true, user: pub })
+  } catch (err) {
+    console.error('2fa login:', err.message)
     res.status(500).json({ error: 'Server error' })
   }
 })
